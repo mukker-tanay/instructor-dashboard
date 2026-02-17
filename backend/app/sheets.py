@@ -29,26 +29,43 @@ class SheetsService:
         self._spreadsheet: Optional[gspread.Spreadsheet] = None
 
     def initialize(self):
-        """Initialize the gspread client with service account credentials."""
+        """Initialize the gspread client using JSON string or service account file."""
         try:
             import os
-            sa_path = settings.google_service_account_file
+            import json
 
-            # Resolve relative paths against the backend/ directory
+            # 1. Try JSON string from env var (best for Render/Heroku)
+            if settings.google_credentials_json:
+                try:
+                    logger.info("Initializing Sheets using GOOGLE_CREDENTIALS_JSON...")
+                    creds_dict = json.loads(settings.google_credentials_json)
+                    creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
+                    self._client = gspread.authorize(creds)
+                    self._spreadsheet = self._client.open_by_key(settings.spreadsheet_id)
+                    logger.info("Google Sheets service initialized successfully (JSON).")
+                    self._ensure_tracking_columns()
+                    return
+                except Exception as e:
+                    logger.error(f"Failed to load credentials from JSON: {e}")
+                    # Fall through to file method if JSON fails
+
+            # 2. Try Service Account File
+            sa_path = settings.google_service_account_file
             if not os.path.isabs(sa_path):
                 backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
                 sa_path = os.path.join(backend_dir, sa_path)
 
-            logger.info(f"Service account file: {sa_path} (exists: {os.path.exists(sa_path)})")
-            logger.info(f"Spreadsheet ID: {settings.spreadsheet_id}")
-
+            logger.info(f"Using service account file: {sa_path} (exists: {os.path.exists(sa_path)})")
+            
             if not os.path.exists(sa_path):
-                raise FileNotFoundError(f"Service account file not found: {sa_path}")
-
+                 # If neither method works
+                if not settings.google_credentials_json:
+                     raise FileNotFoundError(f"Service account file not found: {sa_path} and GOOGLE_CREDENTIALS_JSON not set.")
+                
             creds = Credentials.from_service_account_file(sa_path, scopes=SCOPES)
             self._client = gspread.authorize(creds)
             self._spreadsheet = self._client.open_by_key(settings.spreadsheet_id)
-            logger.info("Google Sheets service initialized successfully.")
+            logger.info("Google Sheets service initialized successfully (File).")
 
             # Ensure tracking columns exist in request sheets
             self._ensure_tracking_columns()

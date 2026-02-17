@@ -16,7 +16,8 @@ class Settings(BaseSettings):
     google_client_secret: str = ""
 
     # Google Sheets
-    google_service_account_file: str = ""
+    google_service_account_file: str = "service-account.json"
+    google_credentials_json: str = ""
     spreadsheet_id: str = ""
 
     # Slack
