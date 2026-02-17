@@ -80,7 +80,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, [fetchUser]);
 
     const login = () => {
-        window.location.href = '/api/auth/login';
+        const apiUrl = import.meta.env.VITE_API_URL || '/api';
+        // Remove trailing slash if present to avoid double slashes
+        const baseUrl = apiUrl.replace(/\/$/, '');
+        window.location.href = `${baseUrl}/auth/login`;
     };
 
     const logout = async () => {

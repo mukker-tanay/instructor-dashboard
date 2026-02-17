@@ -44,12 +44,30 @@ The frontend runs at `http://localhost:5173` and proxies API calls to `http://lo
 
 ## Deployment
 
-To deploy in production (e.g., Render, Heroku):
+### Backend (Cloudflare Workers)
 
-1. **Credentials**: You cannot upload `service-account.json`. Instead:
-    - Open `backend/service-account.json` and copy its entire content.
-    - Set the `GOOGLE_CREDENTIALS_JSON` environment variable to this content.
-2. **Build Start**: The build might time out if the app fails to connect to Sheets. Ensure `GOOGLE_CREDENTIALS_JSON` is set.
+The backend is deployed on Cloudflare Workers (e.g., `*.workers.dev`).
+
+1.  **Environment Variables**:
+    -   Ensure `GOOGLE_CREDENTIALS_JSON` is set in your Worker settings (Settings -> Variables).
+    -   Value should be the content of `backend/service-account.json`.
+
+2.  **Service URL**:
+    -   Note your Worker URL (e.g., `https://instructor-dashboard-backend.tanay-mukker.workers.dev`).
+    -   **Important**: The API base path is likely `/api`, so your full connection string for the frontend will be `https://<YOUR_WORKER_URL>/api`.
+
+### Frontend (Vercel)
+
+1.  **New Project**: Import the repository into Vercel.
+2.  **Build Settings**:
+    -   **Framework Preset**: Vite
+    -   **Root Directory**: `frontend` (if the repo root is not the frontend root)
+    -   **Build Command**: `npm run build`
+    -   **Output Directory**: `dist`
+3.  **Environment Variables**:
+    -   Add `VITE_API_URL`.
+    -   **Value**: `https://<YOUR_WORKER_URL>/api` (e.g., `https://instructor-dashboard-backend.tanay-mukker.workers.dev/api`).
+    -   Redeploy for changes to take effect.
 
 ## Architecture
 

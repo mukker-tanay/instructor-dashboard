@@ -20,3 +20,4 @@ dist/
 service-account.json
 node_modules
 backend/.env
+frontend/.env.example
