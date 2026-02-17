@@ -1,0 +1,132 @@
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { AuthProvider, useAuth } from './auth/AuthContext';
+import Header from './components/Header';
+
+// Pages
+import InstructorDashboard from './pages/instructor/InstructorDashboard';
+import MyRequests from './pages/instructor/MyRequests';
+import MyBatches from './pages/instructor/MyBatches';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import ImpersonateRoute from './pages/admin/ImpersonateRoute';
+
+const queryClient = new QueryClient({
+    defaultOptions: {
+        queries: {
+            retry: 1,
+            refetchOnWindowFocus: false,
+        },
+    },
+});
+
+/* ── Login page ── */
+const LoginPage: React.FC = () => {
+    const { login } = useAuth();
+    return (
+        <div className="login-page">
+            <div className="login-card">
+                <div style={{ marginBottom: '16px' }}>
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                </div>
+                <h1 className="login-title">Instructor Hub</h1>
+                <p className="login-subtitle">
+                    Manage classes, raise requests, and track statuses — all in one place.
+                </p>
+                <button className="google-btn" onClick={login}>
+                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M17.64 9.205c0-.639-.057-1.252-.164-1.841H9v3.481h4.844a4.14 4.14 0 01-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4" />
+                        <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" fill="#34A853" />
+                        <path d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05" />
+                        <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335" />
+                    </svg>
+                    Sign in with Google
+                </button>
+            </div>
+        </div>
+    );
+};
+
+/* ── Protected route wrapper ── */
+const ProtectedRoute: React.FC<{ children: React.ReactNode; adminOnly?: boolean }> = ({
+    children,
+    adminOnly,
+}) => {
+    const { user, loading, isAdmin } = useAuth();
+
+    if (loading) {
+        return (
+            <div className="loading-container" style={{ minHeight: '100vh' }}>
+                <div className="spinner" />
+            </div>
+        );
+    }
+    if (!user) return <Navigate to="/" replace />;
+    if (adminOnly && !isAdmin) return <Navigate to="/instructor/dashboard" replace />;
+
+    return <>{children}</>;
+};
+
+/* ── App layout with header ── */
+const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+    <div className="app-layout">
+        <Header />
+        {children}
+    </div>
+);
+
+/* ── Root component ── */
+const AppContent: React.FC = () => {
+    const { user, loading } = useAuth();
+
+    if (loading) {
+        return (
+            <div className="loading-container" style={{ minHeight: '100vh' }}>
+                <div className="spinner" />
+                <span style={{ color: 'var(--text-muted)' }}>Loading...</span>
+            </div>
+        );
+    }
+
+    return (
+        <Routes>
+            <Route path="/" element={user ? <Navigate to="/instructor/dashboard" replace /> : <LoginPage />} />
+
+            {/* Instructor routes */}
+            <Route path="/instructor/dashboard" element={
+                <ProtectedRoute><AppLayout><InstructorDashboard /></AppLayout></ProtectedRoute>
+            } />
+            <Route path="/instructor/my-requests" element={
+                <ProtectedRoute><AppLayout><MyRequests /></AppLayout></ProtectedRoute>
+            } />
+            <Route path="/instructor/my-batches" element={
+                <ProtectedRoute><AppLayout><MyBatches /></AppLayout></ProtectedRoute>
+            } />
+
+            {/* Admin routes */}
+            <Route path="/instructor/admin" element={
+                <ProtectedRoute adminOnly><AppLayout><AdminDashboard /></AppLayout></ProtectedRoute>
+            } />
+            <Route path="/admin/becomes/:email" element={
+                <ProtectedRoute adminOnly><ImpersonateRoute /></ProtectedRoute>
+            } />
+
+            {/* Fallback */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+    );
+};
+
+const App: React.FC = () => (
+    <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+            <AuthProvider>
+                <AppContent />
+            </AuthProvider>
+        </BrowserRouter>
+    </QueryClientProvider>
+);
+
+export default App;
