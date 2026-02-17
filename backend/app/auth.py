@@ -45,8 +45,8 @@ def resolve_role(email: str) -> str:
 
 
 def _get_redirect_uri() -> str:
-    """Build callback URI via the frontend origin (Vite proxy)."""
-    base = settings.frontend_url.rstrip("/")
+    """Build callback URI. Use API_BASE_URL if set, else Frontend URL (proxy)."""
+    base = (settings.api_base_url or settings.frontend_url).rstrip("/")
     return f"{base}/api/auth/callback"
 
 

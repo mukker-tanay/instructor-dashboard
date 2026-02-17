@@ -44,29 +44,32 @@ The frontend runs at `http://localhost:5173` and proxies API calls to `http://lo
 
 ## Deployment
 
-### Backend (Cloudflare Workers)
+### Backend (Vercel)
 
-The backend is deployed on Cloudflare Workers (e.g., `*.workers.dev`).
-
-1.  **Environment Variables**:
-    -   Ensure `GOOGLE_CREDENTIALS_JSON` is set in your Worker settings (Settings -> Variables).
-    -   Value should be the content of `backend/service-account.json`.
-
-2.  **Service URL**:
-    -   Note your Worker URL (e.g., `https://instructor-dashboard-backend.tanay-mukker.workers.dev`).
-    -   **Important**: The API base path is likely `/api`, so your full connection string for the frontend will be `https://<YOUR_WORKER_URL>/api`.
+1.  **Preparation**:
+    -   Ensure `backend/vercel.json` exists.
+    -   Ensure `backend/api/index.py` exists.
+2.  **Deploy**:
+    -   Import the repository into Vercel.
+    -   **Root Directory**: `backend` (Important: Set this in Project Settings).
+    -   **Framework Preset**: Other
+    -   **Build Command**: (Leave empty)
+    -   **Output Directory**: (Leave empty)
+3.  **Environment Variables**:
+    -   Add `GOOGLE_CREDENTIALS_JSON` with the content of `backend/service-account.json`.
+    -   Add other variables as needed (`SPREADSHEET_ID`, etc.).
 
 ### Frontend (Vercel)
 
-1.  **New Project**: Import the repository into Vercel.
-2.  **Build Settings**:
+1.  **Deploy**:
+    -   Import the repository into Vercel (create a separate project from the backend).
+    -   **Root Directory**: `frontend`
     -   **Framework Preset**: Vite
-    -   **Root Directory**: `frontend` (if the repo root is not the frontend root)
     -   **Build Command**: `npm run build`
     -   **Output Directory**: `dist`
-3.  **Environment Variables**:
+2.  **Environment Variables**:
     -   Add `VITE_API_URL`.
-    -   **Value**: `https://<YOUR_WORKER_URL>/api` (e.g., `https://instructor-dashboard-backend.tanay-mukker.workers.dev/api`).
+    -   **Value**: `https://<YOUR_BACKEND_PROJECT_URL>/api` (e.g., `https://instructor-backend.vercel.app/api`).
     -   Redeploy for changes to take effect.
 
 ## Architecture

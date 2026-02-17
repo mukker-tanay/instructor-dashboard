@@ -30,6 +30,11 @@ class Settings(BaseSettings):
 
     # Frontend
     frontend_url: str = "http://localhost:5173"
+    
+    # API Base URL (for OAuth redirects)
+    # In dev: http://localhost:5173 (proxied) or http://localhost:8000
+    # In prod: https://<your-backend>.onrender.com
+    api_base_url: str = ""
 
     # Admin emails (comma-separated)
     admin_emails: str = ""
