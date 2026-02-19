@@ -127,22 +127,33 @@ async def get_batch_metadata(user: UserInfo = Depends(get_current_user)):
         batch = str(c.get("Batch Name", "")).strip()
         if not batch:
             continue
-        # Parse date to check if upcoming
-        date_str = str(c.get("Date of Class (MM/DD/YYYY)", "")).strip()
-        time_str = str(c.get("Time of Class (HH:MM AM/PM) IST", "")).strip()
-        if not date_str:
-            continue
-        dt = parse_datetime(date_str, time_str)
-        if dt < now:
-            continue
+
         if batch not in meta:
             meta[batch] = {
                 "program": str(c.get("Program", "")).strip(),
                 "modules": set(),
             }
-        mod = str(c.get("Module Name", "")).strip()
-        if mod:
-            meta[batch]["modules"].add(mod)
+        
+        # Populate program if missing (in case earlier classes didn't have it)
+        if not meta[batch]["program"]:
+            meta[batch]["program"] = str(c.get("Program", "")).strip()
+
+        # Only add modules if they are upcoming (optional, but requested behavior seems to be about program)
+        # The user wants "Program" to be auto-filled.
+        # Let's keep module logic as is (upcoming modules only?) or maybe all modules?
+        # The original code filtered by date < now. 
+        # "Upcoming module names" was the docstring.
+        # But for "Program", we should potentialy look at any class.
+        
+        # Parse date to check if upcoming (for module list)
+        date_str = str(c.get("Date of Class (MM/DD/YYYY)", "")).strip()
+        time_str = str(c.get("Time of Class (HH:MM AM/PM) IST", "")).strip()
+        if date_str:
+            dt = parse_datetime(date_str, time_str)
+            if dt >= now:
+                mod = str(c.get("Module Name", "")).strip()
+                if mod:
+                    meta[batch]["modules"].add(mod)
 
     result = {}
     for batch, info in meta.items():

@@ -337,7 +337,12 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
                     </div>
                     <div className="form-group">
                         <label className="form-label form-label-required">Select Approver</label>
-                        <input className="form-input" value={form.approver} onChange={e => update('approver', e.target.value)} placeholder="Approver name or email" />
+                        <select className="form-select" value={form.approver} onChange={e => update('approver', e.target.value)}>
+                            <option value="">Select approver...</option>
+                            {APPROVER_OPTIONS.map(name => (
+                                <option key={name} value={name}>{name}</option>
+                            ))}
+                        </select>
                     </div>
                     <div className="modal-actions">
                         <button className="btn btn-secondary" onClick={handleClose}>Cancel</button>
