@@ -49,9 +49,16 @@ async def get_classes(
     type: str = Query("upcoming", regex="^(upcoming|past)$"),
     limit: int = Query(5, ge=1, le=100),
     offset: int = Query(0, ge=0),
+    offset: int = Query(0, ge=0),
     user: UserInfo = Depends(get_current_user),
 ):
     """Get instructor's upcoming or past classes from cache."""
+    # Lazy Init: if cache is empty (cold start), fetch now
+    try:
+        cache.ensure_initialized()
+    except Exception:
+        pass  # If it fails, we still try to serve what we have or empty
+
     now = datetime.now(IST)
     email = user.email.lower()
 
@@ -93,6 +100,12 @@ async def get_classes(
 @router.get("/batch-options")
 async def get_batch_options(user: UserInfo = Depends(get_current_user)):
     """Get unique batch names for the current instructor (for dropdowns)."""
+    # Lazy Init
+    try:
+        cache.ensure_initialized()
+    except Exception:
+        pass
+
     email = user.email.lower()
     batches = set()
     for c in cache.classes:
@@ -106,6 +119,12 @@ async def get_batch_options(user: UserInfo = Depends(get_current_user)):
 @router.get("/instructors")
 async def get_instructor_options(user: UserInfo = Depends(get_current_user)):
     """Get unique instructor names from all classes (for replacement dropdown)."""
+    # Lazy Init
+    try:
+        cache.ensure_initialized()
+    except Exception:
+        pass
+
     instructors = set()
     for c in cache.classes:
         name = str(c.get("Instructor Name", "")).strip()
@@ -117,6 +136,12 @@ async def get_instructor_options(user: UserInfo = Depends(get_current_user)):
 @router.get("/batch-metadata")
 async def get_batch_metadata(user: UserInfo = Depends(get_current_user)):
     """Return program + upcoming module names per batch for the current instructor."""
+    # Lazy Init
+    try:
+        cache.ensure_initialized()
+    except Exception:
+        pass
+
     email = user.email.lower()
     now = datetime.now(IST)
     # batch -> { program, modules set }

@@ -86,6 +86,14 @@ class CacheManager:
         except Exception as e:
             logger.error(f"Force refresh failed: {e}")
 
+    def ensure_initialized(self) -> None:
+        """If cache is empty, force a refresh immediately (sync).
+        Useful for serverless cold starts where lifespan might have timed out or failed.
+        """
+        if not self._classes:
+            logger.info("Cache empty! forcing on-demand refresh...")
+            self.refresh()
+
 
 # Singleton
 cache = CacheManager()

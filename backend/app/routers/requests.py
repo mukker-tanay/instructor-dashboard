@@ -348,7 +348,13 @@ async def create_class_addition_request(
 
 @router.get("/my-requests")
 async def get_my_requests(user: UserInfo = Depends(get_current_user)):
-    """Get all requests raised by the current instructor."""
+    """Get status of all requests raised by the user."""
+    # Lazy Init
+    try:
+        cache.ensure_initialized()
+    except Exception:
+        pass
+
     email = user.email.lower()
 
     unavailability = [

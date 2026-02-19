@@ -46,6 +46,11 @@ async def get_all_requests(
     admin: UserInfo = Depends(require_admin),
 ):
     """Get all requests (admin view) with optional filters."""
+    # Lazy Init
+    try:
+        cache.ensure_initialized()
+    except Exception:
+        pass
     results = []
 
     if request_type in ("all", "unavailability"):
