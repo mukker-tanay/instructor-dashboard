@@ -20,7 +20,7 @@ PAST_CLASSES_SHEET = "past_classes"
 UNAVAILABILITY_SHEET = "unavailability_requests"
 CLASS_ADDITION_SHEET = "class_addition_requests"
 ID_MAPPING_SHEET = "ID mapping"
-ID_MAPPING_SHEET = "ID mapping"
+BATCH_METRICS_SHEET = "batch_metrics"
 
 # ... (existing code) ...
 
