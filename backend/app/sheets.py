@@ -15,7 +15,8 @@ SCOPES = [
 ]
 
 # Sheet name constants — must match exact Google Sheets tab names
-CLASSES_SHEET = "classes"
+UPCOMING_CLASSES_SHEET = "upcoming_classes"
+PAST_CLASSES_SHEET = "past_classes"
 UNAVAILABILITY_SHEET = "unavailability_requests"
 CLASS_ADDITION_SHEET = "class_addition_requests"
 BATCH_METRICS_SHEET = "batch_metrics"
@@ -114,7 +115,10 @@ class SheetsService:
             return []
 
     def get_all_classes(self) -> List[Dict[str, Any]]:
-        return self.get_all_records(CLASSES_SHEET)
+        """Fetch classes from both upcoming and past sheets and combine them."""
+        upcoming = self.get_all_records(UPCOMING_CLASSES_SHEET)
+        past = self.get_all_records(PAST_CLASSES_SHEET)
+        return upcoming + past
 
     def get_unavailability_requests(self) -> List[Dict[str, Any]]:
         return self.get_all_records(UNAVAILABILITY_SHEET)
