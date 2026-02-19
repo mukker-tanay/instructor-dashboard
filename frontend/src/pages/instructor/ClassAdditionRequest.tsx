@@ -2,6 +2,14 @@ import React, { useState } from 'react';
 import { createClassAdditionRequest } from '../../api/client';
 import Modal from '../../components/Modal';
 
+const APPROVER_OPTIONS = [
+    "Shivank Agrawal",
+    "Shubham Yadav",
+    "Vilas Varghese",
+    "Ayush Raj",
+    "Yogesh K"
+];
+
 const ClassAdditionRequest: React.FC = () => {
     const [form, setForm] = useState({
         program: '',
@@ -16,8 +24,8 @@ const ClassAdditionRequest: React.FC = () => {
         assignment_requirement: 'None',
         reason: '',
         other_comments: '',
-        approver: '',
     });
+    const [approvers, setApprovers] = useState<string[]>([]);
     const [showConfirm, setShowConfirm] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [success, setSuccess] = useState('');
@@ -27,14 +35,19 @@ const ClassAdditionRequest: React.FC = () => {
         setForm(prev => ({ ...prev, [key]: value }));
     };
 
-    const requiredFields = ['program', 'batch_name', 'class_title', 'module_name', 'date_of_class', 'time_of_class', 'reason', 'approver'];
+    const requiredFields = ['program', 'batch_name', 'class_title', 'module_name', 'date_of_class', 'time_of_class', 'reason'];
 
     const validate = () => {
         for (const f of requiredFields) {
             if (!(form as any)[f]) {
-                setError(`Please fill the "${f.replace(/_/g, ' ')}" field.`);
+                const label = f.replace(/_/g, ' ');
+                setError(`Please fill the "${label.charAt(0).toUpperCase() + label.slice(1)}" field.`);
                 return false;
             }
+        }
+        if (approvers.length === 0) {
+            setError("Please select at least one approver.");
+            return false;
         }
         return true;
     };
@@ -48,15 +61,16 @@ const ClassAdditionRequest: React.FC = () => {
         setSubmitting(true);
         setError('');
         try {
-            await createClassAdditionRequest(form);
+            await createClassAdditionRequest({ ...form, approvers });
             setSuccess('Class addition request submitted successfully!');
             setShowConfirm(false);
             setForm({
                 program: '', batch_name: '', class_title: '', module_name: '',
                 date_of_class: '', time_of_class: '', class_type: 'Regular',
                 shift_other_classes: 'No', contest_impact: 'Not Aware',
-                assignment_requirement: 'None', reason: '', other_comments: '', approver: '',
+                assignment_requirement: 'None', reason: '', other_comments: '',
             });
+            setApprovers([]);
         } catch (err: any) {
             setError(err.response?.data?.detail || 'Failed to submit request.');
         } finally {
@@ -164,8 +178,34 @@ const ClassAdditionRequest: React.FC = () => {
                 </div>
 
                 <div className="form-group">
-                    <label className="form-label form-label-required">Select Approver</label>
-                    <input className="form-input" value={form.approver} onChange={e => update('approver', e.target.value)} placeholder="Approver name or email" />
+                    <label className="form-label form-label-required">Select Approvers</label>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
+                        {APPROVER_OPTIONS.map(name => {
+                            const isSelected = approvers.includes(name);
+                            return (
+                                <div
+                                    key={name}
+                                    onClick={() => {
+                                        if (isSelected) setApprovers(prev => prev.filter(n => n !== name));
+                                        else setApprovers(prev => [...prev, name]);
+                                    }}
+                                    style={{
+                                        padding: '6px 12px',
+                                        borderRadius: '20px',
+                                        fontSize: '0.8125rem',
+                                        cursor: 'pointer',
+                                        border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border)',
+                                        background: isSelected ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-secondary)',
+                                        color: isSelected ? 'var(--primary)' : 'var(--text-primary)',
+                                        transition: 'all 0.2s',
+                                        fontWeight: isSelected ? 500 : 400,
+                                    }}
+                                >
+                                    {name}
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
 
                 <div style={{ marginTop: 'var(--space-lg)', display: 'flex', justifyContent: 'flex-end' }}>
@@ -187,6 +227,10 @@ const ClassAdditionRequest: React.FC = () => {
                             <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{v}</span>
                         </div>
                     ))}
+                    <div>
+                        <span style={{ color: 'var(--text-muted)' }}>Approvers: </span>
+                        <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{approvers.join(', ')}</span>
+                    </div>
                 </div>
                 {error && (
                     <div style={{ marginTop: '12px', padding: '8px 12px', background: 'var(--danger-bg)', borderRadius: 'var(--radius-sm)', color: 'var(--danger)', fontSize: '0.8125rem' }}>
