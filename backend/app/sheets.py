@@ -24,6 +24,14 @@ ID_MAPPING_SHEET = "ID mapping"
 
 # ... (existing code) ...
 
+
+class SheetsService:
+    """Manages all interactions with Google Sheets."""
+
+    def __init__(self):
+        self._client: Optional[gspread.Client] = None
+        self._spreadsheet: Optional[gspread.Spreadsheet] = None
+    
     def get_id_mapping(self) -> Dict[str, str]:
         """
         Fetch the ID mapping sheet and return a dictionary mapping Email -> Member ID.
@@ -42,15 +50,6 @@ ID_MAPPING_SHEET = "ID mapping"
         except Exception as e:
             logger.error(f"Error fetching ID mapping: {e}")
             return {}
-
-
-
-class SheetsService:
-    """Manages all interactions with Google Sheets."""
-
-    def __init__(self):
-        self._client: Optional[gspread.Client] = None
-        self._spreadsheet: Optional[gspread.Spreadsheet] = None
 
     def initialize(self):
         """Initialize the gspread client using JSON string or service account file."""
