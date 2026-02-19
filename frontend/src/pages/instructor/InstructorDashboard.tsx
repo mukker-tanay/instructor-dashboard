@@ -542,11 +542,26 @@ const InstructorDashboard: React.FC = () => {
     const filteredUpcoming = applyFilters(upcoming);
     const filteredPast = applyFilters(pastRecent);
 
-    // Derive unique filter options from all loaded classes
+    // Derive unique filter options based on OTHER selections (Facet logic)
     const allClasses = [...upcoming, ...pastRecent];
-    const uniqueBatches = [...new Set(allClasses.map(c => String(c['Batch Name'] || '').trim()).filter(Boolean))].sort();
-    const uniqueDates = [...new Set(allClasses.map(c => String(c['Date of Class (MM/DD/YYYY)'] || '').trim()).filter(Boolean))].sort();
-    const uniqueModules = [...new Set(allClasses.map(c => String(c['Module Name'] || '').trim()).filter(Boolean))].sort();
+
+    const getAvailableOptions = (exclude: 'batch' | 'date' | 'module') => {
+        let result = allClasses;
+        if (exclude !== 'batch' && filterBatch) {
+            result = result.filter(c => String(c['Batch Name'] || '') === filterBatch);
+        }
+        if (exclude !== 'date' && filterDate) {
+            result = result.filter(c => String(c['Date of Class (MM/DD/YYYY)'] || '') === filterDate);
+        }
+        if (exclude !== 'module' && filterModule) {
+            result = result.filter(c => String(c['Module Name'] || '') === filterModule);
+        }
+        return result;
+    };
+
+    const uniqueBatches = [...new Set(getAvailableOptions('batch').map(c => String(c['Batch Name'] || '').trim()).filter(Boolean))].sort();
+    const uniqueDates = [...new Set(getAvailableOptions('date').map(c => String(c['Date of Class (MM/DD/YYYY)'] || '').trim()).filter(Boolean))].sort();
+    const uniqueModules = [...new Set(getAvailableOptions('module').map(c => String(c['Module Name'] || '').trim()).filter(Boolean))].sort();
 
     if (loading) {
         return (
