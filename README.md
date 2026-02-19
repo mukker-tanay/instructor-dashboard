@@ -4,7 +4,7 @@ A comprehensive tool for instructors to manage their schedules, raise unavailabi
 
 ![Instructor Dashboard](frontend/src/images/logo-web.png)
 
-## 🚀 Features
+## Features
 
 ### for Instructors
 - **Dashboard View**: View upcoming and past classes with detailed metadata (attendance, ratings, etc.).
@@ -23,7 +23,7 @@ A comprehensive tool for instructors to manage their schedules, raise unavailabi
 
 ---
 
-## 🛠️ Architecture
+## Architecture
 
 The application is designed to be serverless-friendly (deployable on Vercel) while keeping data manipulation easy for non-technical operations teams (via Google Sheets).
 
@@ -41,7 +41,7 @@ graph LR
 
 ---
 
-## 🧩 Tech Stack
+## Tech Stack
 
 - **Frontend**: React, Vite, TypeScript, Vanilla CSS (with variables).
 - **Backend**: Python 3.9+, FastAPI, Pydantic, GSpread (Google Sheets API).
@@ -49,7 +49,7 @@ graph LR
 
 ---
 
-## ⚡ Setup & Installation
+## Setup & Installation
 
 ### Prerequisites
 1.  **Node.js** (v18+) and **Python** (v3.9+).
@@ -109,7 +109,7 @@ Visit `http://localhost:5173`. Login with a Google account listed in your sheets
 
 ---
 
-## ⚙️ Configuration (Environment Variables)
+## Configuration (Environment Variables)
 
 These variables must be set in your `.env` (local) or Vercel Project Settings.
 
@@ -129,7 +129,7 @@ These variables must be set in your `.env` (local) or Vercel Project Settings.
 
 ---
 
-## 📦 Deployment (Vercel)
+## Deployment (Vercel)
 
 This repo is set up for **Vercel** deployment. You can deploy it as a monorepo or two separate projects. We recommend a **Single Project** approach using Vercel Rewrites.
 
@@ -151,7 +151,7 @@ For Slack tagging to work, your Google Sheet must have a tab named `ID mapping` 
 
 ---
 
-## ❓ Troubleshooting
+## Troubleshooting
 
 **Q: 401 Unauthorized after Login?**
 -   Check if you are on a Vercel Preview URL. The cookie is explicitly set for the domain in `FRONTEND_URL`. If they don't match, the browser drops the cookie.
