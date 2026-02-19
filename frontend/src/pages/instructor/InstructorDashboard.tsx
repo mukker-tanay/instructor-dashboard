@@ -159,8 +159,9 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
         program: '', batch_name: '', class_title: '', module_name: '',
         date_of_class: '', time_of_class: '', class_type: 'Regular',
         shift_other_classes: 'No', contest_impact: 'Not Aware',
-        assignment_requirement: 'None', reason: '', other_comments: '', approver: '',
+        assignment_requirement: 'None', reason: '', other_comments: '',
     });
+    const [approvers, setApprovers] = useState<string[]>([]);
     const [step, setStep] = useState<'form' | 'confirm'>('form');
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
@@ -171,10 +172,10 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
     React.useEffect(() => {
         if (isOpen) {
             getBatchOptions()
-                .then(d => { console.log('batch options:', d); setBatchOptions(d.batches); })
+                .then(d => { setBatchOptions(d.batches); })
                 .catch(err => console.error('batch-options error:', err));
             getBatchMetadata()
-                .then(d => { console.log('batch metadata:', d); setBatchMeta(d.batch_metadata); })
+                .then(d => { setBatchMeta(d.batch_metadata); })
                 .catch(err => console.error('batch-metadata error:', err));
         }
     }, [isOpen]);
@@ -196,14 +197,19 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
         ? batchMeta[form.batch_name].modules
         : [];
 
-    const requiredFields = ['program', 'batch_name', 'class_title', 'module_name', 'date_of_class', 'time_of_class', 'reason', 'approver'];
+    const requiredFields = ['program', 'batch_name', 'class_title', 'module_name', 'date_of_class', 'time_of_class', 'reason'];
 
     const validate = () => {
         for (const f of requiredFields) {
             if (!(form as any)[f]) {
-                setError(`Please fill the "${f.replace(/_/g, ' ')}" field.`);
+                const label = f.replace(/_/g, ' ');
+                setError(`Please fill the "${label.charAt(0).toUpperCase() + label.slice(1)}" field.`);
                 return false;
             }
+        }
+        if (approvers.length === 0) {
+            setError("Please select at least one approver.");
+            return false;
         }
         return true;
     };
@@ -214,7 +220,7 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
         setSubmitting(true);
         setError('');
         try {
-            await createClassAdditionRequest(form);
+            await createClassAdditionRequest({ ...form, approvers });
             resetForm();
             onSuccess();
             onClose();
@@ -230,8 +236,9 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
             program: '', batch_name: '', class_title: '', module_name: '',
             date_of_class: '', time_of_class: '', class_type: 'Regular',
             shift_other_classes: 'No', contest_impact: 'Not Aware',
-            assignment_requirement: 'None', reason: '', other_comments: '', approver: '',
+            assignment_requirement: 'None', reason: '', other_comments: '',
         });
+        setApprovers([]);
         setStep('form');
         setError('');
     };
@@ -336,13 +343,34 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
                         <textarea className="form-textarea" value={form.other_comments} onChange={e => update('other_comments', e.target.value)} placeholder="Optional" />
                     </div>
                     <div className="form-group">
-                        <label className="form-label form-label-required">Select Approver</label>
-                        <select className="form-select" value={form.approver} onChange={e => update('approver', e.target.value)}>
-                            <option value="">Select approver...</option>
-                            {APPROVER_OPTIONS.map(name => (
-                                <option key={name} value={name}>{name}</option>
-                            ))}
-                        </select>
+                        <label className="form-label form-label-required">Select Approvers</label>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
+                            {APPROVER_OPTIONS.map(name => {
+                                const isSelected = approvers.includes(name);
+                                return (
+                                    <div
+                                        key={name}
+                                        onClick={() => {
+                                            if (isSelected) setApprovers(prev => prev.filter(n => n !== name));
+                                            else setApprovers(prev => [...prev, name]);
+                                        }}
+                                        style={{
+                                            padding: '6px 12px',
+                                            borderRadius: '20px',
+                                            fontSize: '0.8125rem',
+                                            cursor: 'pointer',
+                                            border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border)',
+                                            background: isSelected ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-secondary)',
+                                            color: isSelected ? 'var(--primary)' : 'var(--text-primary)',
+                                            transition: 'all 0.2s',
+                                            fontWeight: isSelected ? 500 : 400,
+                                        }}
+                                    >
+                                        {name}
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
                     <div className="modal-actions">
                         <button className="btn btn-secondary" onClick={handleClose}>Cancel</button>
@@ -363,6 +391,10 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
                                 <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{v}</span>
                             </div>
                         ))}
+                        <div>
+                            <span style={{ color: 'var(--text-muted)' }}>Approvers: </span>
+                            <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{approvers.join(', ')}</span>
+                        </div>
                     </div>
                     <div className="modal-actions">
                         <button className="btn btn-secondary" onClick={() => setStep('form')}>Edit</button>

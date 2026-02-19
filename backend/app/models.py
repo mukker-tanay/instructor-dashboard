@@ -115,6 +115,13 @@ class ClassAdditionRequestCreate(BaseModel):
     reason: str = Field(..., min_length=1)
     other_comments: Optional[str] = ""
     approver: str = Field(..., min_length=1)
+    class_type: str = "Regular"
+    shift_other_classes: str = "No"
+    contest_impact: str = "Not Aware"
+    assignment_requirement: str = "None"
+    reason: str = Field(..., min_length=1)
+    other_comments: Optional[str] = ""
+    approvers: List[str] = Field(default_factory=list, description="List of selected approvers")
 
 
 class ClassAdditionRequestRow(BaseModel):

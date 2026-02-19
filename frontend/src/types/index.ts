@@ -56,7 +56,8 @@ export interface ClassAdditionPayload {
     assignment_requirement: string;
     reason: string;
     other_comments?: string;
-    approver: string;
+    other_comments?: string;
+    approvers: string[];
 }
 
 export interface RequestItem {

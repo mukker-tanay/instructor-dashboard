@@ -256,15 +256,6 @@ async def create_class_addition_request(
     now = datetime.now().strftime("%m/%d/%Y %I:%M %p")
 
     # Row order matches sheet headers exactly:
-    # Instructor Email, Instructor Name, Program, Batch Name, Class Title,
-    # Module Name, Date of Class (MM/DD/YYYY), Time of Class (HH:MM AM/PM) IST,
-    # Class Type (Regular/Optional), Shift other Classes by 1(Yes/No),
-    # Will this addition affect the live contest date?(Yes/No/Not Aware),
-    # Requirement of Assignment & Homework(...), Reason for Addition of Class,
-    # Other Comments, Select Approver, Submitted by, Time stamp,
-    # Slack Thread Link, Actual Date of Class,
-    # Class Added on Class Day/Non-Class Day Sanctioned/Non-Sanctioned,
-    # Slack Link, Red Flag, request_id, status, locked_by, locked_at
     row = [
         user.email,                     # Instructor Email
         user.name,                      # Instructor Name
@@ -280,7 +271,7 @@ async def create_class_addition_request(
         body.assignment_requirement,    # Requirement of Assignment & Homework
         body.reason,                    # Reason for Addition of Class
         body.other_comments or "",      # Other Comments
-        body.approver,                  # Select Approver
+        ", ".join(body.approvers),      # Select Approver (Joined list)
         user.email,                     # Submitted by
         now,                            # Time stamp
         "",                             # Slack Thread Link
@@ -296,26 +287,59 @@ async def create_class_addition_request(
 
     await asyncio.to_thread(sheets_service.append_row, CLASS_ADDITION_SHEET, row)
 
+    # --- Slack Notification (Bot API with Tagging) ---
+    
+    # Helper to lookup IDs and format tags (Copied from unavailability - ideally refactor to util)
+    all_mapping_records = sheets_service.get_all_records("ID mapping")
+    
+    def get_slack_tag(name: str) -> str:
+        clean_name = name.strip().lower()
+        member_id = ""
+        for r in all_mapping_records:
+            if str(r.get("Name", "")).strip().lower() == clean_name:
+                member_id = str(r.get("Member ID", "")).strip()
+                break
+        
+        if member_id:
+            if member_id.startswith("S"):
+                    return f"<!subteam^{member_id}>"
+            return f"<@{member_id}>"
+        return name
+
+    STANDARD_CC_LIST = [
+        "Amar Srivastava", "Rishabh Gupta", "Vagesh Garg", 
+        "classroom_program", "dsml-ops-group"
+    ]
+
+    tagged_approvers = [get_slack_tag(name) for name in body.approvers]
+    approvers_str = ", ".join(tagged_approvers) if tagged_approvers else "None"
+    
+    tagged_ccs = [get_slack_tag(name) for name in STANDARD_CC_LIST]
+    ccs_str = ", ".join(tagged_ccs)
+
     slack_msg = (
-        f"*Class Addition Request*\n"
-        f"*Instructor Email*\n{user.email}\n"
-        f"*Instructor Name*\n{user.name}\n"
-        f"*Program*\n{body.program}\n"
-        f"*Batch Name*\n{body.batch_name}\n"
-        f"*Class Title*\n{body.class_title}\n"
-        f"*Module Name*\n{body.module_name}\n"
-        f"*Date of Class (MM/DD/YYYY)*\n{body.date_of_class}\n"
-        f"*Time of Class (HH:MM AM/PM) IST*\n{body.time_of_class}\n"
-        f"*Class Type*\n{body.class_type}\n"
-        f"*Shift other Classes by 1*\n{body.shift_other_classes}\n"
-        f"*Will this addition affect the live contest date?*\n{body.contest_impact}\n"
-        f"*Requirement of Assignment & Homework*\n{body.assignment_requirement}\n"
-        f"*Reason for Addition of Class*\n{body.reason}\n"
-        f"*Other Comments*\n{body.other_comments or ''}\n"
-        f"*Select Approver*\n{body.approver}"
+        f"🚨 *New Class Addition Request*\n"
+        f"*Instructor:* {user.name} ({user.email})\n"
+        f"*Batch:* {body.batch_name} ({body.program})\n"
+        f"*Class:* {body.class_title} ({body.module_name})\n"
+        f"*Proposed Date:* {body.date_of_class} {body.time_of_class}\n"
+        f"*Reason:* {body.reason}\n"
+        f"*Approvers:* {approvers_str}\n"
+        f"*CC:* {ccs_str}\n\n"
+        f"*Details:*\n"
+        f"• Type: {body.class_type}\n"
+        f"• Shift Others: {body.shift_other_classes}\n"
+        f"• Contest Impact: {body.contest_impact}\n"
+        f"• Assignments: {body.assignment_requirement}\n"
+        f"• Comments: {body.other_comments or 'N/A'}"
     )
 
-    fire_slack_notification(slack_msg)
+    # Fire and forget using the Bot API helper
+    async def send_notification():
+        from app.slack import send_slack_notification
+        await send_slack_notification(slack_msg)
+
+    asyncio.create_task(send_notification())
 
     await asyncio.to_thread(cache.force_refresh_requests)
 
