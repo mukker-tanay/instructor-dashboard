@@ -10,16 +10,25 @@ import type {
 
 const api = axios.create({
     baseURL: import.meta.env.VITE_API_URL || '/api',
-    withCredentials: true,
+    // withCredentials: true, // Cookies not used anymore
+});
+
+// Add request interceptor to attach Bearer token
+api.interceptors.request.use((config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
 });
 
 /* ── Auth ── */
 export const getMe = () => api.get<User>('/auth/me').then(r => r.data);
 export const logout = () => api.post('/auth/logout');
 export const impersonateUser = (email: string) =>
-    api.post<{ admin_token: string }>('/auth/impersonate', { email }).then(r => r.data);
+    api.post<{ admin_token: string; token: string }>('/auth/impersonate', { email }).then(r => r.data);
 export const stopImpersonateUser = (adminToken: string) =>
-    api.post('/auth/stop-impersonate', { admin_token: adminToken }).then(r => r.data);
+    api.post<{ token: string }>('/auth/stop-impersonate', { admin_token: adminToken }).then(r => r.data);
 
 /* ── Classes ── */
 export const getClasses = (type: 'upcoming' | 'past', limit = 5, offset = 0) =>

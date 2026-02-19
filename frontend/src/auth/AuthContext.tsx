@@ -47,17 +47,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, []);
 
     useEffect(() => {
+        // Check for token in URL (callback from backend)
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get('token');
+        if (token) {
+            localStorage.setItem('token', token);
+            // Clean URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+
         fetchUser();
     }, [fetchUser]);
 
     const startImpersonating = useCallback(async (email: string) => {
         try {
             // Backend swaps the session cookie and returns the admin's original token
-            const { admin_token } = await impersonateUser(email);
+            // NOW: Backend returns { admin_token: string, token: string }
+            const { token, admin_token } = await impersonateUser(email);
+            localStorage.setItem('token', token); // Use the new impersonated token
             localStorage.setItem('impersonate_email', email);
             localStorage.setItem('admin_token', admin_token);
             setImpersonating(email);
-            // Re-fetch user — now the session cookie is for the impersonated user
+            // Re-fetch user
             await fetchUser();
         } catch (err) {
             console.error('Impersonation failed:', err);
@@ -68,7 +79,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
             const adminToken = localStorage.getItem('admin_token') || '';
             // Backend restores the admin's session cookie
-            await stopImpersonateUser(adminToken);
+            // NOW: Backend returns { token: string } (the restored admin token)
+            // We sent { admin_token } in body
+            const { token } = await stopImpersonateUser(adminToken);
+            localStorage.setItem('token', token); // Restore admin token
             localStorage.removeItem('impersonate_email');
             localStorage.removeItem('admin_token');
             setImpersonating(null);
@@ -90,6 +104,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await apiLogout();
         setUser(null);
         setImpersonating(null);
+        localStorage.removeItem('token'); // Clear main token
         localStorage.removeItem('impersonate_email');
         localStorage.removeItem('admin_token');
         window.location.href = '/';
