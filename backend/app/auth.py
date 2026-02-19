@@ -113,9 +113,9 @@ async def auth_callback(request: Request, code: str):
         key="session",
         value=token,
         httponly=True,
-        samesite="lax",
+        samesite="none",
         max_age=settings.jwt_expiry_hours * 3600,
-        secure=False,  # Set to True in production with HTTPS
+        secure=True,
     )
     return response
 
@@ -169,9 +169,9 @@ async def impersonate(request: Request):
         key="session",
         value=new_token,
         httponly=True,
-        samesite="lax",
+        samesite="none",
         max_age=settings.jwt_expiry_hours * 3600,
-        secure=False,
+        secure=True,
     )
     return response
 
@@ -197,9 +197,9 @@ async def stop_impersonate(request: Request):
         key="session",
         value=admin_token,
         httponly=True,
-        samesite="lax",
+        samesite="none",
         max_age=settings.jwt_expiry_hours * 3600,
-        secure=False,
+        secure=True,
     )
     return response
 
