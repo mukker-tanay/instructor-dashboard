@@ -49,7 +49,6 @@ async def get_classes(
     type: str = Query("upcoming", regex="^(upcoming|past)$"),
     limit: int = Query(5, ge=1, le=100),
     offset: int = Query(0, ge=0),
-    offset: int = Query(0, ge=0),
     user: UserInfo = Depends(get_current_user),
 ):
     """Get instructor's upcoming or past classes from cache."""
