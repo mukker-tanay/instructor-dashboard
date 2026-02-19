@@ -107,26 +107,24 @@ async def auth_callback(request: Request, code: str):
 
     token = create_jwt(user)
 
-    # Redirect to frontend with token in URL param
-    # The frontend will grab this, save to localStorage, and strip it from URL
-    redirect_url = f"{settings.frontend_url}?token={token}"
-    return RedirectResponse(url=redirect_url)
+    # Redirect to frontend root (proxy handles cookie domain)
+    response = RedirectResponse(url=settings.frontend_url)
+    response.set_cookie(
+        key="session",
+        value=token,
+        httponly=True,
+        samesite="lax",
+        max_age=settings.jwt_expiry_hours * 3600,
+        secure=True,
+    )
+    return response
 
 
 @router.get("/me")
 async def get_me(request: Request):
     """Return current user info from JWT cookie."""
-    """Return current user info from JWT header."""
-    # Check Authorization header: Bearer <token>
-    auth_header = request.headers.get("Authorization")
-    token = None
-    if auth_header and auth_header.startswith("Bearer "):
-        token = auth_header.split(" ")[1]
-    
-    if not token:
-        # Fallback to query param or cookie (optional, but good for transition)
-        token = request.query_params.get("token") or request.cookies.get("session")
-
+    """Return current user info from JWT cookie."""
+    token = request.cookies.get("session")
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
     payload = decode_jwt(token)
@@ -143,12 +141,7 @@ async def impersonate(request: Request):
     """Admin-only: issue a new JWT as another user and set it as the session cookie.
     Expects JSON body: { "email": "target@example.com" }
     The admin's original JWT is returned so the frontend can restore it later."""
-    # Get admin token from header
-    auth_header = request.headers.get("Authorization")
-    token = None
-    if auth_header and auth_header.startswith("Bearer "):
-        token = auth_header.split(" ")[1]
-    
+    token = request.cookies.get("session")
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
@@ -177,8 +170,15 @@ async def impersonate(request: Request):
     response = Response(status_code=200)
     response.headers["Content-Type"] = "application/json"
     import json
-    # Return the new token so frontend can switch to it
-    response.body = json.dumps({"token": new_token, "admin_token": token}).encode()
+    response.body = json.dumps({"admin_token": token}).encode()
+    response.set_cookie(
+        key="session",
+        value=new_token,
+        httponly=True,
+        samesite="lax",
+        max_age=settings.jwt_expiry_hours * 3600,
+        secure=True,
+    )
     return response
 
 
@@ -202,8 +202,15 @@ async def stop_impersonate(request: Request):
     response = Response(status_code=200)
     response.headers["Content-Type"] = "application/json"
     import json
-    # Return the restored admin token
-    response.body = json.dumps({"token": admin_token}).encode()
+    response.body = json.dumps({"ok": True}).encode()
+    response.set_cookie(
+        key="session",
+        value=admin_token,
+        httponly=True,
+        samesite="lax",
+        max_age=settings.jwt_expiry_hours * 3600,
+        secure=True,
+    )
     return response
 
 
@@ -211,5 +218,5 @@ async def stop_impersonate(request: Request):
 async def logout():
     """Clear session cookie."""
     response = Response(status_code=200)
-    # No cookie to delete, frontend clears localStorage
-    return Response(status_code=200)
+    response.delete_cookie("session")
+    return response
