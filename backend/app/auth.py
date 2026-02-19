@@ -167,10 +167,6 @@ async def impersonate(request: Request):
     response.headers["Content-Type"] = "application/json"
     import json
     response.body = json.dumps({"admin_token": token}).encode()
-    response = Response(status_code=200)
-    response.headers["Content-Type"] = "application/json"
-    import json
-    response.body = json.dumps({"admin_token": token}).encode()
     response.set_cookie(
         key="session",
         value=new_token,
@@ -195,10 +191,6 @@ async def stop_impersonate(request: Request):
     if payload.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Invalid admin token")
 
-    response = Response(status_code=200)
-    response.headers["Content-Type"] = "application/json"
-    import json
-    response.body = json.dumps({"ok": True}).encode()
     response = Response(status_code=200)
     response.headers["Content-Type"] = "application/json"
     import json

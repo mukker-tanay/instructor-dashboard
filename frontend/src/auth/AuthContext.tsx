@@ -64,34 +64,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     }, [fetchUser]);
 
-    const stopImpersonating = useCallback(async () => {
-        try {
-            const adminToken = localStorage.getItem('admin_token') || '';
-            // Backend restores the admin's session cookie
-            await stopImpersonateUser(adminToken);
-            localStorage.removeItem('impersonate_email');
-            localStorage.removeItem('admin_token');
-            setImpersonating(null);
-            // Re-fetch user — now the session cookie is the admin's again
-            await fetchUser();
-        } catch (err) {
-            console.error('Stop impersonation failed:', err);
-        }
-    }, [fetchUser]);
-
     const login = () => {
         // Use relative path for proxy
         window.location.href = '/api/auth/login';
     };
 
-    const logout = async () => {
+    const logout = useCallback(async () => {
         await apiLogout();
         setUser(null);
         setImpersonating(null);
         localStorage.removeItem('impersonate_email');
         localStorage.removeItem('admin_token');
         window.location.href = '/';
-    };
+    }, []);
+
+    const stopImpersonating = useCallback(async () => {
+        try {
+            const adminToken = localStorage.getItem('admin_token') || '';
+            // Backend restores the admin's session cookie
+            await stopImpersonateUser(adminToken);
+
+            // Clean up local state
+            localStorage.removeItem('impersonate_email');
+            localStorage.removeItem('admin_token');
+            setImpersonating(null);
+
+            // Reload to ensure clean state and fresh cookie usage
+            window.location.href = '/';
+        } catch (err: any) {
+            console.error('Stop impersonation failed:', err);
+            // If the admin token is expired/invalid (401/403), we must logout
+            if (err.response && (err.response.status === 401 || err.response.status === 403)) {
+                alert('Your admin session has expired. Please log in again.');
+                await logout();
+            } else {
+                alert('Failed to stop impersonating. See console for details.');
+            }
+        }
+    }, [logout]);
 
     // isAdmin: true if the user is admin (when not impersonating)
     // or if we have an admin_token saved (meaning real user is admin)
