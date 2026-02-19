@@ -95,9 +95,18 @@ async def update_request_status(
         raise HTTPException(status_code=404, detail="Request not found.")
 
     # Check if already finalized
+    # Check if already finalized
     current_status = str(record.get("status", record.get("Status", ""))).strip()
-    if current_status in ("Approved", "Rejected"):
-        raise HTTPException(status_code=400, detail="Request already finalized.")
+    
+    # Allow updating "Approved" requests for Class Addition (to update payment status)
+    if current_status == "Rejected":
+        raise HTTPException(status_code=400, detail="Request already rejected.")
+            
+    if current_status == "Approved" and req_type == "unavailability":
+         # Unavailability requests usually shouldn't change after approval (simplification)
+         # But if you want to allow changing RI later, you can remove this check too.
+         # For now, let's keep it strict for unavailability unless needed.
+         raise HTTPException(status_code=400, detail="Unavailability request already finalized.")
 
     # Check lock
     locked_by = str(record.get("locked_by", "")).strip()

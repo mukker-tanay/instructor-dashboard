@@ -48,17 +48,32 @@ const AdminDashboard: React.FC = () => {
         setSelectedRequest(r);
         setError('');
         setLockError('');
-        setStatusVal('Approved');
+
+        // Pre-fill fields if already approved
+        const currentStatus = String(r.status || r.Status || 'Pending').trim();
+        setStatusVal(currentStatus === 'Approved' ? 'Approved' : 'Approved'); // Default to Approved if opening edit, or if pending
+
+        if (currentStatus === 'Approved' && r.request_type === 'class_addition') {
+            // Try to map existing values if available in the request object (depends on API return)
+            // For now, we might default or need to trust the admin to re-select. 
+            // Ideally we should parse the existing "Sanctioned/Non-Sanctioned" value if it's returned.
+            // Let's see if we can map it.
+            const payment = String(r['Class Added on Class Day/Non-Class Day Sanctioned/Non-Sanctioned'] || r['Sanctioned/Non-Sanctioned'] || 'Sanctioned');
+            setPaymentStatus(payment);
+
+            const rf = String(r['Red Flag'] || 'No');
+            setRedFlag(rf);
+        } else {
+            // Reset class addition fields
+            setPaymentStatus('Sanctioned');
+            setRedFlag('No');
+            setRedFlagReason('');
+        }
 
         // Reset unavailability fields
         setFinalStatus('');
         setReplacementInstructor('');
         setRedFlagProof('');
-
-        // Reset class addition fields
-        setPaymentStatus('Sanctioned');
-        setRedFlag('No');
-        setRedFlagReason('');
 
         // Fetch instructors for replacement dropdown if unavailability
         if (r.request_type === 'unavailability') {
@@ -218,10 +233,10 @@ const AdminDashboard: React.FC = () => {
                                     Currently handled by {String(r.locked_by)}
                                 </div>
                             )}
-                            {status === 'Pending' && (
+                            {(status === 'Pending' || (status === 'Approved' && !isUnavail)) && (
                                 <div style={{ marginTop: '12px' }}>
                                     <button className="btn btn-primary btn-sm" onClick={() => openApproval(r)}>
-                                        Change Status
+                                        {status === 'Pending' ? 'Change Status' : 'Edit'}
                                     </button>
                                 </div>
                             )}
@@ -311,6 +326,7 @@ const AdminDashboard: React.FC = () => {
                                         <option value="Sanctioned">Sanctioned</option>
                                         <option value="Non-sanctioned">Non-sanctioned</option>
                                         <option value="Unpaid">Unpaid</option>
+                                        <option value="To be Audited">To be Audited</option>
                                     </select>
                                 </div>
 

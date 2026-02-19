@@ -40,6 +40,7 @@ export interface UnavailabilityPayload {
     teaching_pace_style: string;
     suggested_replacement?: string;
     other_comments?: string;
+    approvers?: string[];
 }
 
 export interface ClassAdditionPayload {

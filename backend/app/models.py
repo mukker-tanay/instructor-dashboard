@@ -24,6 +24,7 @@ class PaymentStatus(str, Enum):
     SANCTIONED = "Sanctioned"
     NON_SANCTIONED = "Non-sanctioned"
     UNPAID = "Unpaid"
+    TO_BE_AUDITED = "To be Audited"
 
 
 class RedFlag(str, Enum):
@@ -60,6 +61,8 @@ class UnavailabilityRequestCreate(BaseModel):
     teaching_pace_style: str = Field(..., min_length=1)
     suggested_replacement: Optional[str] = ""
     other_comments: Optional[str] = ""
+    approvers: List[str] = Field(default_factory=list, description="List of selected approvers")
+    approvers: List[str] = Field(default_factory=list, description="List of selected approvers")
 
 
 class UnavailabilityRequestRow(BaseModel):
@@ -81,6 +84,7 @@ class UnavailabilityRequestRow(BaseModel):
     topics_and_promises: str = ""
     batch_pulse_persona: str = ""
     teaching_pace_style: str = ""
+    approvers: str = ""  # Comma-separated string for sheet
     raised_timestamp: str = ""
     raised_by: str = ""
     slack_thread_link: str = ""

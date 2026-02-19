@@ -12,6 +12,14 @@ interface UnavailModalProps {
     onSuccess: () => void;
 }
 
+const APPROVER_OPTIONS = [
+    "Shivank Agrawal",
+    "Shubham Yadav",
+    "Vilas Varghese",
+    "Ayush Raj",
+    "Yogesh K"
+];
+
 const UnavailabilityModal: React.FC<UnavailModalProps> = ({ cls, isOpen, onClose, onSuccess }) => {
     const [reason, setReason] = useState('');
     const [topics, setTopics] = useState('');
@@ -19,17 +27,18 @@ const UnavailabilityModal: React.FC<UnavailModalProps> = ({ cls, isOpen, onClose
     const [teachingPace, setTeachingPace] = useState('');
     const [suggestedReplacement, setSuggestedReplacement] = useState('');
     const [otherComments, setOtherComments] = useState('');
+    const [approvers, setApprovers] = useState<string[]>([]);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
 
     const resetForm = () => {
         setReason(''); setTopics(''); setBatchPulse(''); setTeachingPace('');
-        setSuggestedReplacement(''); setOtherComments(''); setError('');
+        setSuggestedReplacement(''); setOtherComments(''); setApprovers([]); setError('');
     };
 
     const handleSubmit = async () => {
-        if (!reason || !topics || !batchPulse || !teachingPace) {
-            setError('Please fill all mandatory fields.');
+        if (!reason || !topics || !batchPulse || !teachingPace || approvers.length === 0) {
+            setError('Please fill all mandatory fields and select at least one approver.');
             return;
         }
         setSubmitting(true);
@@ -43,6 +52,7 @@ const UnavailabilityModal: React.FC<UnavailModalProps> = ({ cls, isOpen, onClose
                 teaching_pace_style: teachingPace,
                 suggested_replacement: suggestedReplacement,
                 other_comments: otherComments,
+                approvers,
             });
             resetForm();
             onSuccess();
@@ -94,6 +104,37 @@ const UnavailabilityModal: React.FC<UnavailModalProps> = ({ cls, isOpen, onClose
             <div className="form-group">
                 <label className="form-label">Other Comments</label>
                 <textarea className="form-textarea" value={otherComments} onChange={e => setOtherComments(e.target.value)} placeholder="Optional" />
+            </div>
+
+            <div className="form-group">
+                <label className="form-label form-label-required">Select Approvers</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
+                    {APPROVER_OPTIONS.map(name => {
+                        const isSelected = approvers.includes(name);
+                        return (
+                            <div
+                                key={name}
+                                onClick={() => {
+                                    if (isSelected) setApprovers(prev => prev.filter(n => n !== name));
+                                    else setApprovers(prev => [...prev, name]);
+                                }}
+                                style={{
+                                    padding: '6px 12px',
+                                    borderRadius: '20px',
+                                    fontSize: '0.8125rem',
+                                    cursor: 'pointer',
+                                    border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border)',
+                                    background: isSelected ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-secondary)',
+                                    color: isSelected ? 'var(--primary)' : 'var(--text-primary)',
+                                    transition: 'all 0.2s',
+                                    fontWeight: isSelected ? 500 : 400,
+                                }}
+                            >
+                                {name}
+                            </div>
+                        );
+                    })}
+                </div>
             </div>
 
             <div className="modal-actions">

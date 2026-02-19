@@ -139,44 +139,103 @@ async def create_unavailability_request(
         class_title = cls.get('class_title', cls.get('Class Title', ''))
         class_type = cls.get('class_type', cls.get('Class Type (Regular/Optional)', cls.get('Class Type', '')))
 
-        slack_msg = (
-            f"*Instructor Email*\n{user.email}\n"
-            f"*Instructor Name*\n{user.name}\n"
-            f"*Program*\n{program}\n"
-            f"*Batch Name*\n{batch_name}\n"
-            f"*SBAT Group ID*\n{sbat}\n"
-            f"*Class Title*\n{class_title}\n"
-            f"*Module Name*\n{module}\n"
-            f"*Original Date of Class (MM/DD/YYYY)*\n{date_str}\n"
-            f"*Original Time of Class (HH:MM AM/PM) IST*\n{time_str}\n"
-            f"*Class Type*\n{class_type}\n"
-            f"*Reason for Unavailability*\n{body.reason}\n"
-            f"*Any other Comments*\n{body.other_comments or ''}\n"
-            f"*Suggested Instructors for Replacement*\n{body.suggested_replacement or ''}\n"
-            f"*Topics & Promises From Previous Class*\n{body.topics_and_promises}\n"
-            f"*Batch Pulse & Persona*\n{body.batch_pulse_persona}\n"
-            f"*Recommended Teaching Pace & Style*\n{body.teaching_pace_style}"
+
+        # Standard CC List
+        STANDARD_CC_LIST = [
+            "Amar Srivastava", "Rishabh Gupta", "Vagesh Garg", 
+            "classroom_program", "dsml-ops-group"
+        ]
+
+        # Helper to lookup IDs and format tags
+        all_mapping_records = sheets_service.get_all_records("ID mapping")
+        
+        def get_slack_tag(name: str) -> str:
+            clean_name = name.strip().lower()
+            member_id = ""
+            for r in all_mapping_records:
+                if str(r.get("Name", "")).strip().lower() == clean_name:
+                    member_id = str(r.get("Member ID", "")).strip()
+                    break
+            
+            if member_id:
+                # User Group IDs usually start with 'S', Users with 'U' or 'W'
+                if member_id.startswith("S"):
+                     return f"<!subteam^{member_id}>"
+                return f"<@{member_id}>"
+            return name # Fallback to name
+
+        # Tag Approvers
+        tagged_approvers = [get_slack_tag(name) for name in body.approvers]
+        approvers_str = ", ".join(tagged_approvers) if tagged_approvers else "None"
+
+        # Tag CCs
+        tagged_ccs = [get_slack_tag(name) for name in STANDARD_CC_LIST]
+        ccs_str = ", ".join(tagged_ccs)
+
+        # 1. Main Message: Key Info
+        main_msg = (
+            f"🚨 *New Unavailability Request*\n"
+            f"*Class:* {class_title}\n"
+            f"*Instructor:* {user.name} ({user.email})\n"
+            f"*Date:* {date_str} {time_str}\n"
+            f"*Batch:* {batch_name} ({program})\n"
+            f"*Reason:* {body.reason}\n"
+            f"*Approvers:* {approvers_str}\n"
+            f"*CC:* {ccs_str}"
         )
 
-        # Fetch batch metrics and append to the message
+        # 2. Detailed Message (Thread)
+        detail_msg = (
+            f"*Full Details:*\n"
+            f"• *Module:* {module}\n"
+            f"• *SBAT Group:* {sbat}\n"
+            f"• *Class Type:* {class_type}\n"
+            f"• *Other Comments:* {body.other_comments or 'N/A'}\n"
+            f"• *Suggested Replacement:* {body.suggested_replacement or 'N/A'}\n"
+            f"• *Topics & Promises:* {body.topics_and_promises}\n"
+            f"• *Batch Pulse:* {body.batch_pulse_persona}\n"
+            f"• *Teaching Style:* {body.teaching_pace_style}"
+        )
+
+        # Fetch batch metrics
         try:
             metrics = await asyncio.to_thread(sheets_service.get_batch_metrics, str(batch_name))
             if metrics:
+                # Extract values to variables for cleaner f-string
+                nps = metrics.get('Batch NPS', 'N/A')
+                reschedules = metrics.get('Reschedules in this module', 'N/A')
+                break_days = metrics.get('No of break class days', 'N/A')
+                remaining = metrics.get("How many classes are remaining in this module?", "N/A")
+                completed = metrics.get('Classes Completed', 'N/A')
                 ri_count = metrics.get("No of RI's allocated", "N/A")
                 ri_names = metrics.get("RI's Allocated", "N/A")
-                slack_msg += (
+
+                detail_msg += (
                     f"\n\n*Batch Metrics:*\n"
-                    f"*Current Module*\n{metrics.get('Current Module', 'N/A')}\n"
-                    f"*Batch NPS*\n{metrics.get('Batch NPS', 'N/A')}\n"
-                    f"*Reschedules in this module*\n{metrics.get('Reschedules in this module', 'N/A')}\n"
-                    f"*No of break class days*\n{metrics.get('No of break class days', 'N/A')}\n"
-                    f"*No of RI's allocated*\n{ri_count}\n"
-                    f"*RI's Allocated*\n{ri_names}"
+                    f"Batch NPS: {nps}\n"
+                    f"Number of reschedules in the current module: {reschedules}\n"
+                    f"Number of break days between the end of this module and the start of the next: {break_days} class days\n"
+                    f"How many classes are remaining in this module?: {remaining}\n"
+                    f"Classes completed in this module: {completed}\n"
+                    f"Number of RIs deployed in this module so far, along with names: {ri_count}, {ri_names}"
                 )
         except Exception:
-            pass  # Don't block request creation if metrics fetch fails
+            pass
 
-        fire_slack_notification(slack_msg)
+        # Send Main Message -> Get TS -> Send Details in Thread
+        # We need to do this asynchronously but essentially sequentially for this request context
+        # to ensure we have the TS.
+        # Since fire_slack_notification is fire-and-forget, we'll wrap this logic in a small async function
+        # and fire THAT as a background task.
+        
+        async def send_threaded():
+            from app.slack import send_slack_notification
+            ts = await send_slack_notification(main_msg)
+            if ts:
+                await send_slack_notification(detail_msg, thread_ts=ts)
+        
+        loop = asyncio.get_running_loop()
+        loop.create_task(send_threaded())
 
     # Refresh cache after write
     await asyncio.to_thread(cache.force_refresh_requests)

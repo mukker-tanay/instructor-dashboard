@@ -19,7 +19,30 @@ UPCOMING_CLASSES_SHEET = "upcoming_classes"
 PAST_CLASSES_SHEET = "past_classes"
 UNAVAILABILITY_SHEET = "unavailability_requests"
 CLASS_ADDITION_SHEET = "class_addition_requests"
-BATCH_METRICS_SHEET = "batch_metrics"
+ID_MAPPING_SHEET = "ID mapping"
+ID_MAPPING_SHEET = "ID mapping"
+
+# ... (existing code) ...
+
+    def get_id_mapping(self) -> Dict[str, str]:
+        """
+        Fetch the ID mapping sheet and return a dictionary mapping Email -> Member ID.
+        Assumes columns: Email, Name, Member ID.
+        """
+        try:
+            records = self.get_all_records(ID_MAPPING_SHEET)
+            mapping = {}
+            for r in records:
+                # Normalize keys (handle potential case/spacing variations if user manually created sheet)
+                email = str(r.get("Email", "")).strip().lower()
+                member_id = str(r.get("Member ID", "")).strip()
+                if email and member_id:
+                    mapping[email] = member_id
+            return mapping
+        except Exception as e:
+            logger.error(f"Error fetching ID mapping: {e}")
+            return {}
+
 
 
 class SheetsService:
@@ -136,6 +159,25 @@ class SheetsService:
         except Exception as e:
             logger.warning(f"Could not fetch batch metrics for '{batch_name}': {e}")
         return None
+
+    def get_id_mapping(self) -> Dict[str, str]:
+        """
+        Fetch the ID mapping sheet and return a dictionary mapping Email -> Member ID.
+        Assumes columns: Email, Name, Member ID.
+        """
+        try:
+            records = self.get_all_records(ID_MAPPING_SHEET)
+            mapping = {}
+            for r in records:
+                # Normalize keys (handle potential case/spacing variations if user manually created sheet)
+                email = str(r.get("Email", "")).strip().lower()
+                member_id = str(r.get("Member ID", "")).strip()
+                if email and member_id:
+                    mapping[email] = member_id
+            return mapping
+        except Exception as e:
+            logger.error(f"Error fetching ID mapping: {e}")
+            return {}
 
     def append_row(self, sheet_name: str, row_data: List[Any]) -> None:
         """Append a single row to the specified sheet."""

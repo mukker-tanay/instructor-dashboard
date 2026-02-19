@@ -21,7 +21,9 @@ class Settings(BaseSettings):
     spreadsheet_id: str = ""
 
     # Slack
-    slack_webhook_url: str = ""
+    slack_webhook_url: str = ""  # Deprecated in favor of Bot API
+    slack_bot_token: str = ""
+    slack_channel_id: str = ""
 
     # JWT
     jwt_secret: str = "change-me-in-production"
