@@ -13,7 +13,10 @@ interface Policy {
 }
 
 const PoliciesPage: React.FC = () => {
-    const { user, isAdmin } = useAuth();
+    const { user } = useAuth();
+    // Use role directly — isAdmin can be true for impersonating admins, which is wrong here
+    const canManage = user?.role === 'admin';
+
     const [policies, setPolicies] = useState<Policy[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -31,11 +34,13 @@ const PoliciesPage: React.FC = () => {
 
     const load = useCallback(async () => {
         setLoading(true);
+        setError('');
         try {
             const data = await getPolicies();
             setPolicies(data.policies);
-        } catch {
-            setError('Failed to load policies.');
+        } catch (err: any) {
+            const msg = err?.response?.data?.detail || err?.message || 'Failed to load policies.';
+            setError(msg);
         } finally {
             setLoading(false);
         }
@@ -66,8 +71,9 @@ const PoliciesPage: React.FC = () => {
             setForm({ name: '', url: '', description: '', category: '' });
             setShowForm(false);
             await load();
-        } catch {
-            setError('Failed to add policy.');
+        } catch (err: any) {
+            const msg = err?.response?.data?.detail || err?.message || 'Failed to add policy.';
+            setError(msg);
         } finally {
             setSubmitting(false);
         }
@@ -76,12 +82,14 @@ const PoliciesPage: React.FC = () => {
     const handleDelete = async (row: number, name: string) => {
         if (!confirm(`Delete policy "${name}"?`)) return;
         setDeletingRow(row);
+        setError('');
         try {
             await deletePolicy(row);
             setSuccess('Policy deleted.');
             await load();
-        } catch {
-            setError('Failed to delete policy.');
+        } catch (err: any) {
+            const msg = err?.response?.data?.detail || err?.message || 'Failed to delete policy.';
+            setError(msg);
         } finally {
             setDeletingRow(null);
         }
@@ -94,27 +102,34 @@ const PoliciesPage: React.FC = () => {
                     <h1 className="page-title">Policies</h1>
                     <p className="page-subtitle">Company policy documents and guidelines</p>
                 </div>
-                {isAdmin && (
-                    <button className="btn btn-primary" onClick={() => setShowForm(s => !s)}>
-                        {showForm ? 'Cancel' : 'Add Policy'}
+                <div style={{ display: 'flex', gap: '8px' }}>
+                    <button className="btn btn-secondary btn-sm" onClick={load} disabled={loading} title="Refresh list">
+                        {loading ? '…' : '↻ Refresh'}
                     </button>
-                )}
+                    {canManage && (
+                        <button className="btn btn-primary" onClick={() => setShowForm(s => !s)}>
+                            {showForm ? 'Cancel' : 'Add Policy'}
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Feedback */}
             {success && (
-                <div style={{ padding: 'var(--space-md)', background: 'var(--success-bg)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 'var(--radius-md)', color: 'var(--success)', marginBottom: 'var(--space-lg)', fontSize: '0.875rem' }}>
-                    {success}
+                <div style={{ padding: 'var(--space-md)', background: 'var(--success-bg)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 'var(--radius-md)', color: 'var(--success)', marginBottom: 'var(--space-lg)', fontSize: '0.875rem', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>{success}</span>
+                    <button onClick={() => setSuccess('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--success)' }}>✕</button>
                 </div>
             )}
             {error && (
-                <div style={{ padding: 'var(--space-md)', background: 'var(--danger-bg)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 'var(--radius-md)', color: 'var(--danger)', marginBottom: 'var(--space-lg)', fontSize: '0.875rem' }}>
-                    {error}
+                <div style={{ padding: 'var(--space-md)', background: 'var(--danger-bg)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 'var(--radius-md)', color: 'var(--danger)', marginBottom: 'var(--space-lg)', fontSize: '0.875rem', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>{error}</span>
+                    <button onClick={() => setError('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)' }}>✕</button>
                 </div>
             )}
 
             {/* Add policy form (admin only) */}
-            {showForm && isAdmin && (
+            {showForm && canManage && (
                 <div className="card" style={{ marginBottom: 'var(--space-lg)', padding: 'var(--space-lg)' }}>
                     <h3 style={{ fontSize: '0.9375rem', fontWeight: 600, marginBottom: 'var(--space-md)' }}>New Policy</h3>
                     <form onSubmit={handleAdd}>
@@ -196,7 +211,9 @@ const PoliciesPage: React.FC = () => {
             ) : filtered.length === 0 ? (
                 <div className="empty-state">
                     <div className="empty-state-icon">—</div>
-                    <p className="empty-state-text">{policies.length === 0 ? 'No policies have been added yet.' : 'No policies match your search.'}</p>
+                    <p className="empty-state-text">
+                        {policies.length === 0 ? 'No policies have been added yet.' : 'No policies match your search.'}
+                    </p>
                 </div>
             ) : (
                 <div style={{ display: 'grid', gap: 'var(--space-md)' }}>
@@ -248,7 +265,7 @@ const PoliciesPage: React.FC = () => {
                                 >
                                     View
                                 </a>
-                                {isAdmin && (
+                                {canManage && (
                                     <button
                                         className="btn btn-sm"
                                         onClick={() => handleDelete(policy.row, policy.name)}

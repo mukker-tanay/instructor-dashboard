@@ -40,7 +40,6 @@ def _ensure_sheet() -> None:
 async def list_policies(user: UserInfo = Depends(get_current_user)):
     """Return all policies (available to all authenticated users)."""
     try:
-        await asyncio.to_thread(_ensure_sheet)
         records = await asyncio.to_thread(sheets_service.get_all_records, POLICIES_SHEET)
         # Attach a 1-based data row index (header = row 1, first data row = row 2)
         policies = []
