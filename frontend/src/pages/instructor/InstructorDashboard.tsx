@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { getClasses, createUnavailabilityRequest, createClassAdditionRequest, getBatchOptions, getMyRequests, getBatchMetadata } from '../../api/client';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { getClasses, createUnavailabilityRequest, createClassAdditionRequest, getMyBatches, getMyRequests, getBatchMetadata } from '../../api/client';
 import type { ClassItem } from '../../types';
 import Modal from '../../components/Modal';
 import type { BatchMeta } from '../../api/client';
@@ -147,6 +147,118 @@ const UnavailabilityModal: React.FC<UnavailModalProps> = ({ cls, isOpen, onClose
     );
 };
 
+/* ─── Shared SearchableDropdown ─── */
+interface SearchableDropdownProps {
+    options: string[];
+    value: string;
+    onChange: (val: string) => void;
+    placeholder?: string;
+    disabled?: boolean;
+}
+
+const SearchableDropdown: React.FC<SearchableDropdownProps> = ({ options, value, onChange, placeholder = 'Select...', disabled }) => {
+    const [open, setOpen] = useState(false);
+    const [query, setQuery] = useState('');
+    const ref = useRef<HTMLDivElement>(null);
+
+    const filtered = options.filter(o => o.toLowerCase().includes(query.toLowerCase()));
+
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
+    const handleSelect = (val: string) => {
+        onChange(val);
+        setQuery('');
+        setOpen(false);
+    };
+
+    return (
+        <div ref={ref} style={{ position: 'relative' }}>
+            <div
+                className="form-select"
+                onClick={() => { if (!disabled) setOpen(o => !o); }}
+                style={{
+                    cursor: disabled ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    userSelect: 'none',
+                    opacity: disabled ? 0.6 : 1,
+                    gap: '8px',
+                }}
+            >
+                <span style={{ color: value ? 'var(--text-primary)' : 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {value || placeholder}
+                </span>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', flexShrink: 0 }}>▼</span>
+            </div>
+            {open && (
+                <div style={{
+                    position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
+                    background: 'var(--surface)', border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-md)', zIndex: 9999,
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+                    maxHeight: '220px', display: 'flex', flexDirection: 'column',
+                }}>
+                    <div style={{ padding: '8px', borderBottom: '1px solid var(--border)' }}>
+                        <input
+                            autoFocus
+                            className="form-input"
+                            style={{ padding: '6px 10px', fontSize: '0.8125rem', margin: 0 }}
+                            placeholder="Search..."
+                            value={query}
+                            onChange={e => setQuery(e.target.value)}
+                            onClick={e => e.stopPropagation()}
+                        />
+                    </div>
+                    <div style={{ overflowY: 'auto', flex: 1 }}>
+                        {filtered.length === 0 ? (
+                            <div style={{ padding: '10px 12px', color: 'var(--text-muted)', fontSize: '0.8125rem' }}>No results</div>
+                        ) : filtered.map(o => (
+                            <div
+                                key={o}
+                                onMouseDown={() => handleSelect(o)}
+                                style={{
+                                    padding: '9px 12px',
+                                    cursor: 'pointer',
+                                    fontSize: '0.875rem',
+                                    background: value === o ? 'rgba(59,130,246,0.08)' : 'transparent',
+                                    color: value === o ? 'var(--primary)' : 'var(--text-primary)',
+                                    transition: 'background 0.15s',
+                                }}
+                                onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-elevated)')}
+                                onMouseLeave={e => (e.currentTarget.style.background = value === o ? 'rgba(59,130,246,0.08)' : 'transparent')}
+                            >
+                                {o}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+/* Generate 30-min time slots for the day */
+const generateTimeSlots = (): string[] => {
+    const slots: string[] = [];
+    for (let h = 0; h < 24; h++) {
+        for (const m of [0, 30]) {
+            const ampm = h < 12 ? 'AM' : 'PM';
+            const hour = h === 0 ? 12 : h > 12 ? h - 12 : h;
+            const min = m === 0 ? '00' : '30';
+            slots.push(`${hour}:${min} ${ampm}`);
+        }
+    }
+    return slots;
+};
+const TIME_SLOTS = generateTimeSlots();
+
 /* ─── Class Addition Modal ─── */
 interface ClassAddModalProps {
     isOpen: boolean;
@@ -158,7 +270,7 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
     const [form, setForm] = useState({
         program: '', batch_name: '', class_title: '', module_name: '',
         date_of_class: '', time_of_class: '', class_type: 'Regular',
-        shift_other_classes: 'No', contest_impact: 'Not Aware',
+        shift_other_classes: 'No',
         assignment_requirement: 'None', reason: '', other_comments: '',
     });
     const [approvers, setApprovers] = useState<string[]>([]);
@@ -168,12 +280,12 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
     const [batchOptions, setBatchOptions] = useState<string[]>([]);
     const [batchMeta, setBatchMeta] = useState<Record<string, BatchMeta>>({});
 
-    // Fetch batch options + metadata on open
+    // Fetch instructor's own batches + metadata on open
     React.useEffect(() => {
         if (isOpen) {
-            getBatchOptions()
-                .then(d => { setBatchOptions(d.batches); })
-                .catch(err => console.error('batch-options error:', err));
+            getMyBatches()
+                .then(d => { setBatchOptions(Object.keys(d.batches)); })
+                .catch(err => console.error('my-batches error:', err));
             getBatchMetadata()
                 .then(d => { setBatchMeta(d.batch_metadata); })
                 .catch(err => console.error('batch-metadata error:', err));
@@ -188,16 +300,24 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
         setForm(prev => ({
             ...prev,
             batch_name: batch,
-            program: meta?.program || prev.program,
-            module_name: '',  // reset module so user picks from new list
+            program: meta?.program || '',
+            module_name: '',
         }));
     };
 
     const moduleOptions = form.batch_name && batchMeta[form.batch_name]
-        ? batchMeta[form.batch_name].modules
-        : [];
+        ? [...batchMeta[form.batch_name].modules, 'Others']
+        : ['Others'];
 
-    const requiredFields = ['program', 'batch_name', 'class_title', 'module_name', 'date_of_class', 'time_of_class', 'reason'];
+    /* Format YYYY-MM-DD → DD/MM/YYYY for display */
+    const formatDateDisplay = (val: string) => {
+        if (!val) return '';
+        const [y, m, d] = val.split('-');
+        if (!y || !m || !d) return val;
+        return `${d}/${m}/${y}`;
+    };
+
+    const requiredFields = ['batch_name', 'class_title', 'module_name', 'date_of_class', 'time_of_class', 'reason'];
 
     const validate = () => {
         for (const f of requiredFields) {
@@ -208,7 +328,7 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
             }
         }
         if (approvers.length === 0) {
-            setError("Please select at least one approver.");
+            setError('Please select at least one approver.');
             return false;
         }
         return true;
@@ -235,7 +355,7 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
         setForm({
             program: '', batch_name: '', class_title: '', module_name: '',
             date_of_class: '', time_of_class: '', class_type: 'Regular',
-            shift_other_classes: 'No', contest_impact: 'Not Aware',
+            shift_other_classes: 'No',
             assignment_requirement: 'None', reason: '', other_comments: '',
         });
         setApprovers([]);
@@ -244,6 +364,15 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
     };
 
     const handleClose = () => { resetForm(); onClose(); };
+
+    const FIELD_LABELS: Record<string, string> = {
+        program: 'Program', batch_name: 'Batch Name', class_title: 'Class Title',
+        module_name: 'Module Name', date_of_class: 'Date of Class',
+        time_of_class: 'Time (IST)', class_type: 'Class Type',
+        shift_other_classes: 'Shift Others by 1',
+        assignment_requirement: 'Assignment & Homework', reason: 'Reason for Addition',
+        other_comments: 'Other Comments',
+    };
 
     return (
         <Modal isOpen={isOpen} onClose={handleClose} title="Request Class Addition">
@@ -255,50 +384,86 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
 
             {step === 'form' && (
                 <>
+                    {/* Row 1: Batch Name + Program */}
                     <div className="form-row">
                         <div className="form-group">
                             <label className="form-label form-label-required">Batch Name</label>
-                            <select className="form-select" value={form.batch_name} onChange={e => handleBatchChange(e.target.value)}>
-                                <option value="">Select batch...</option>
-                                {batchOptions.map(b => (
-                                    <option key={b} value={b}>{b}</option>
-                                ))}
-                            </select>
+                            <SearchableDropdown
+                                options={batchOptions}
+                                value={form.batch_name}
+                                onChange={handleBatchChange}
+                                placeholder="Select batch..."
+                            />
                         </div>
                         <div className="form-group">
                             <label className="form-label form-label-required">Program</label>
-                            <input className="form-input" value={form.program} onChange={e => update('program', e.target.value)} placeholder="Auto-filled from batch" readOnly={!!batchMeta[form.batch_name]?.program} style={batchMeta[form.batch_name]?.program ? { background: 'var(--bg-secondary)', cursor: 'not-allowed' } : {}} />
+                            <input
+                                className="form-input"
+                                value={form.program}
+                                readOnly
+                                placeholder="Auto-filled from batch"
+                                style={{ background: 'var(--bg-secondary)', cursor: 'not-allowed', color: form.program ? 'var(--text-primary)' : 'var(--text-muted)' }}
+                            />
                         </div>
                     </div>
+
+                    {/* Row 2: Module Name + Class Title */}
                     <div className="form-row">
                         <div className="form-group">
                             <label className="form-label form-label-required">Module Name</label>
-                            {moduleOptions.length > 0 ? (
-                                <select className="form-select" value={form.module_name} onChange={e => update('module_name', e.target.value)}>
-                                    <option value="">Select module...</option>
-                                    {moduleOptions.map(m => (
-                                        <option key={m} value={m}>{m}</option>
-                                    ))}
-                                </select>
-                            ) : (
-                                <input className="form-input" value={form.module_name} onChange={e => update('module_name', e.target.value)} placeholder="Module name" />
-                            )}
+                            <SearchableDropdown
+                                options={moduleOptions}
+                                value={form.module_name}
+                                onChange={v => update('module_name', v)}
+                                placeholder="Select module..."
+                                disabled={!form.batch_name}
+                            />
                         </div>
                         <div className="form-group">
                             <label className="form-label form-label-required">Class Title</label>
-                            <input className="form-input" value={form.class_title} onChange={e => update('class_title', e.target.value)} placeholder="Class title" />
+                            <input
+                                className="form-input"
+                                value={form.class_title}
+                                onChange={e => update('class_title', e.target.value)}
+                                placeholder="Enter class title"
+                            />
                         </div>
                     </div>
+
+                    {/* Row 3: Date + Time */}
                     <div className="form-row">
                         <div className="form-group">
                             <label className="form-label form-label-required">Date of Class</label>
-                            <input className="form-input" type="date" value={form.date_of_class} onChange={e => update('date_of_class', e.target.value)} />
+                            <div style={{ position: 'relative' }}>
+                                <input
+                                    className="form-input"
+                                    type="date"
+                                    value={form.date_of_class}
+                                    onChange={e => update('date_of_class', e.target.value)}
+                                    style={{ paddingRight: form.date_of_class ? '90px' : undefined }}
+                                />
+                                {form.date_of_class && (
+                                    <span style={{
+                                        position: 'absolute', right: '36px', top: '50%', transform: 'translateY(-50%)',
+                                        fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 600, pointerEvents: 'none',
+                                    }}>
+                                        {formatDateDisplay(form.date_of_class)}
+                                    </span>
+                                )}
+                            </div>
                         </div>
                         <div className="form-group">
                             <label className="form-label form-label-required">Time (IST)</label>
-                            <input className="form-input" type="time" value={form.time_of_class} onChange={e => update('time_of_class', e.target.value)} />
+                            <SearchableDropdown
+                                options={TIME_SLOTS}
+                                value={form.time_of_class}
+                                onChange={v => update('time_of_class', v)}
+                                placeholder="Select time..."
+                            />
                         </div>
                     </div>
+
+                    {/* Row 4: Class Type + Shift */}
                     <div className="form-row">
                         <div className="form-group">
                             <label className="form-label">Class Type</label>
@@ -308,40 +473,38 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
                             </select>
                         </div>
                         <div className="form-group">
-                            <label className="form-label">Shift Other Classes by 1?</label>
+                            <label className="form-label">Shift Other Classes by 1</label>
                             <select className="form-select" value={form.shift_other_classes} onChange={e => update('shift_other_classes', e.target.value)}>
                                 <option value="No">No</option>
                                 <option value="Yes">Yes</option>
                             </select>
                         </div>
                     </div>
-                    <div className="form-row">
-                        <div className="form-group">
-                            <label className="form-label">Will this affect the live contest date?</label>
-                            <select className="form-select" value={form.contest_impact} onChange={e => update('contest_impact', e.target.value)}>
-                                <option value="Not Aware">Not Aware</option>
-                                <option value="Yes">Yes</option>
-                                <option value="No">No</option>
-                            </select>
-                        </div>
-                        <div className="form-group">
-                            <label className="form-label">Assignment & Homework Requirement</label>
-                            <select className="form-select" value={form.assignment_requirement} onChange={e => update('assignment_requirement', e.target.value)}>
-                                <option value="None">None</option>
-                                <option value="Assignment">Assignment</option>
-                                <option value="Homework">Homework</option>
-                                <option value="Both">Both</option>
-                            </select>
-                        </div>
+
+                    {/* Row 5: Assignment & Homework (full width) */}
+                    <div className="form-group">
+                        <label className="form-label">Assignment &amp; Homework Requirement</label>
+                        <select className="form-select" value={form.assignment_requirement} onChange={e => update('assignment_requirement', e.target.value)}>
+                            <option value="None">None</option>
+                            <option value="Assignment">Assignment</option>
+                            <option value="Homework">Homework</option>
+                            <option value="Both">Both</option>
+                        </select>
                     </div>
+
+                    {/* Reason */}
                     <div className="form-group">
                         <label className="form-label form-label-required">Reason for Addition</label>
                         <textarea className="form-textarea" value={form.reason} onChange={e => update('reason', e.target.value)} placeholder="Explain why this class needs to be added" />
                     </div>
+
+                    {/* Other Comments */}
                     <div className="form-group">
                         <label className="form-label">Other Comments</label>
                         <textarea className="form-textarea" value={form.other_comments} onChange={e => update('other_comments', e.target.value)} placeholder="Optional" />
                     </div>
+
+                    {/* Approvers */}
                     <div className="form-group">
                         <label className="form-label form-label-required">Select Approvers</label>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
@@ -372,9 +535,10 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
                             })}
                         </div>
                     </div>
+
                     <div className="modal-actions">
                         <button className="btn btn-secondary" onClick={handleClose}>Cancel</button>
-                        <button className="btn btn-primary" onClick={handleContinue}>Review & Submit</button>
+                        <button className="btn btn-primary" onClick={handleContinue}>Review &amp; Submit</button>
                     </div>
                 </>
             )}
@@ -387,8 +551,10 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '0.8125rem' }}>
                         {Object.entries(form).filter(([, v]) => v).map(([k, v]) => (
                             <div key={k}>
-                                <span style={{ color: 'var(--text-muted)' }}>{k.replace(/_/g, ' ')}: </span>
-                                <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{v}</span>
+                                <span style={{ color: 'var(--text-muted)' }}>{FIELD_LABELS[k] || k.replace(/_/g, ' ')}: </span>
+                                <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
+                                    {k === 'date_of_class' ? formatDateDisplay(v) : v}
+                                </span>
                             </div>
                         ))}
                         <div>
@@ -396,6 +562,11 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
                             <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{approvers.join(', ')}</span>
                         </div>
                     </div>
+                    {error && (
+                        <div style={{ marginTop: '12px', padding: '8px 12px', background: 'var(--danger-bg)', borderRadius: 'var(--radius-sm)', color: 'var(--danger)', fontSize: '0.8125rem' }}>
+                            {error}
+                        </div>
+                    )}
                     <div className="modal-actions">
                         <button className="btn btn-secondary" onClick={() => setStep('form')}>Edit</button>
                         <button className="btn btn-primary" onClick={handleSubmit} disabled={submitting}>

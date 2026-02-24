@@ -52,7 +52,7 @@ export interface ClassAdditionPayload {
     time_of_class: string;
     class_type: string;
     shift_other_classes: string;
-    contest_impact: string;
+    contest_impact?: string;
     assignment_requirement: string;
     reason: string;
     other_comments?: string;
