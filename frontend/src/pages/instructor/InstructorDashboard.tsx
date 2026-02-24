@@ -197,12 +197,12 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({ options, value,
             {open && (
                 <div style={{
                     position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
-                    background: 'var(--surface)', border: '1px solid var(--border)',
+                    background: 'var(--bg-card)', border: '1px solid var(--border-light)',
                     borderRadius: 'var(--radius-md)', zIndex: 9999,
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+                    boxShadow: 'var(--shadow-lg)',
                     maxHeight: '220px', display: 'flex', flexDirection: 'column',
                 }}>
-                    <div style={{ padding: '8px', borderBottom: '1px solid var(--border)' }}>
+                    <div style={{ padding: '8px', borderBottom: '1px solid var(--border-light)' }}>
                         <input
                             autoFocus
                             className="form-input"
@@ -228,8 +228,8 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({ options, value,
                                     color: value === o ? 'var(--primary)' : 'var(--text-primary)',
                                     transition: 'background 0.15s',
                                 }}
-                                onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-elevated)')}
-                                onMouseLeave={e => (e.currentTarget.style.background = value === o ? 'rgba(59,130,246,0.08)' : 'transparent')}
+                                onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-secondary)')}
+                                onMouseLeave={e => (e.currentTarget.style.background = value === o ? 'rgba(59,130,246,0.12)' : 'transparent')}
                             >
                                 {o}
                             </div>
