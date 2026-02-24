@@ -27,6 +27,7 @@ const PoliciesPage: React.FC = () => {
     const [form, setForm] = useState({ name: '', url: '', description: '', category: '' });
     const [submitting, setSubmitting] = useState(false);
     const [deletingRow, setDeletingRow] = useState<number | null>(null);
+    const [viewingPolicy, setViewingPolicy] = useState<Policy | null>(null);
 
     // search / filter
     const [search, setSearch] = useState('');
@@ -263,14 +264,12 @@ const PoliciesPage: React.FC = () => {
 
                             {/* Actions */}
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                                <a
-                                    href={policy.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
+                                <button
                                     className="btn btn-primary btn-sm"
+                                    onClick={() => setViewingPolicy(policy)}
                                 >
                                     View
-                                </a>
+                                </button>
                                 {canManage && (
                                     <button
                                         className="btn btn-sm"
@@ -284,6 +283,46 @@ const PoliciesPage: React.FC = () => {
                             </div>
                         </div>
                     ))}
+                </div>
+            )}
+
+            {/* ── PDF / Doc viewer modal ── */}
+            {viewingPolicy && (
+                <div className="modal-overlay" onClick={() => setViewingPolicy(null)} style={{ zIndex: 1000 }}>
+                    <div
+                        className="modal"
+                        onClick={e => e.stopPropagation()}
+                        style={{ width: '92vw', maxWidth: '1100px', height: '90vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}
+                    >
+                        {/* Header */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                                <span style={{ fontWeight: 600, fontSize: '0.9375rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{viewingPolicy.name}</span>
+                                {viewingPolicy.category && (
+                                    <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 500, background: 'rgba(99,102,241,0.12)', color: 'var(--accent-primary)', flexShrink: 0 }}>
+                                        {viewingPolicy.category}
+                                    </span>
+                                )}
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                                <a
+                                    href={viewingPolicy.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="btn btn-secondary btn-sm"
+                                >
+                                    Open in new tab
+                                </a>
+                                <button className="btn btn-ghost btn-sm" onClick={() => setViewingPolicy(null)} style={{ fontSize: '1.1rem', lineHeight: 1 }}>✕</button>
+                            </div>
+                        </div>
+                        {/* Document viewer */}
+                        <iframe
+                            src={viewingPolicy.url}
+                            title={viewingPolicy.name}
+                            style={{ flex: 1, border: 'none', width: '100%', display: 'block' }}
+                        />
+                    </div>
                 </div>
             )}
         </div>
