@@ -233,6 +233,5 @@ class SheetsService:
             logger.error(f"Error deleting row {row_number} from '{sheet_name}': {e}")
             raise
 
-
 # Singleton instance
 sheets_service = SheetsService()

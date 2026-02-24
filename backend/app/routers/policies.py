@@ -1,4 +1,4 @@
-"""Policies endpoints — list, add, and delete policy PDFs stored in Google Sheets."""
+"""Policies endpoints — list, add, and delete policy documents stored in Google Sheets."""
 
 import asyncio
 from datetime import datetime
@@ -41,7 +41,6 @@ async def list_policies(user: UserInfo = Depends(get_current_user)):
     """Return all policies (available to all authenticated users)."""
     try:
         records = await asyncio.to_thread(sheets_service.get_all_records, POLICIES_SHEET)
-        # Attach a 1-based data row index (header = row 1, first data row = row 2)
         policies = []
         for i, r in enumerate(records, start=2):
             policies.append({
@@ -58,13 +57,13 @@ async def list_policies(user: UserInfo = Depends(get_current_user)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("")
+@router.post("", status_code=201)
 async def add_policy(body: PolicyCreate, admin: UserInfo = Depends(require_admin)):
     """Add a new policy entry (admin only)."""
     if not body.name.strip():
         raise HTTPException(status_code=400, detail="Policy name is required.")
     if not body.url.strip():
-        raise HTTPException(status_code=400, detail="Policy URL is required.")
+        raise HTTPException(status_code=400, detail="Policy file path or URL is required.")
     try:
         await asyncio.to_thread(_ensure_sheet)
         now = datetime.now().strftime("%m/%d/%Y %I:%M %p")
