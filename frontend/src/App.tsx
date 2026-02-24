@@ -8,6 +8,7 @@ import Header from './components/Header';
 import InstructorDashboard from './pages/instructor/InstructorDashboard';
 import MyRequests from './pages/instructor/MyRequests';
 import MyBatches from './pages/instructor/MyBatches';
+import PoliciesPage from './pages/instructor/PoliciesPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import ImpersonateRoute from './pages/admin/ImpersonateRoute';
 
@@ -103,6 +104,9 @@ const AppContent: React.FC = () => {
             } />
             <Route path="/instructor/my-batches" element={
                 <ProtectedRoute><AppLayout><MyBatches /></AppLayout></ProtectedRoute>
+            } />
+            <Route path="/instructor/policies" element={
+                <ProtectedRoute><AppLayout><PoliciesPage /></AppLayout></ProtectedRoute>
             } />
 
             {/* Admin routes */}

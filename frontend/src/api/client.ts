@@ -72,4 +72,21 @@ export const unlockRequest = (requestId: string) =>
 /* ── Health ── */
 export const healthCheck = () => api.get('/health').then(r => r.data);
 
+/* ── Policies ── */
+export interface Policy {
+    row: number;
+    name: string;
+    url: string;
+    description: string;
+    category: string;
+    added_by: string;
+    added_at: string;
+}
+export const getPolicies = () =>
+    api.get<{ policies: Policy[]; total: number }>('/policies').then(r => r.data);
+export const addPolicy = (data: { name: string; url: string; description?: string; category?: string }) =>
+    api.post('/policies', data).then(r => r.data);
+export const deletePolicy = (rowIndex: number) =>
+    api.delete(`/policies/${rowIndex}`).then(r => r.data);
+
 export default api;

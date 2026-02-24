@@ -21,6 +21,7 @@ UNAVAILABILITY_SHEET = "unavailability_requests"
 CLASS_ADDITION_SHEET = "class_addition_requests"
 ID_MAPPING_SHEET = "ID mapping"
 BATCH_METRICS_SHEET = "batch_metrics"
+POLICIES_SHEET = "policies"
 
 # ... (existing code) ...
 
@@ -221,6 +222,16 @@ class SheetsService:
         except Exception as e:
             logger.error(f"Error reading headers from '{sheet_name}': {e}")
             return {}
+
+    def delete_row(self, sheet_name: str, row_number: int) -> None:
+        """Delete a specific row by 1-based row number (header = row 1)."""
+        try:
+            worksheet = self.spreadsheet.worksheet(sheet_name)
+            worksheet.delete_rows(row_number)
+            logger.info(f"Deleted row {row_number} from '{sheet_name}'.")
+        except Exception as e:
+            logger.error(f"Error deleting row {row_number} from '{sheet_name}': {e}")
+            raise
 
 
 # Singleton instance

@@ -116,6 +116,14 @@ const Header: React.FC = () => {
                                         {user.role}
                                     </span>
                                 </div>
+                                <Link
+                                    to="/instructor/policies"
+                                    className="dropdown-item"
+                                    onClick={() => setShowDropdown(false)}
+                                    style={{ display: 'block' }}
+                                >
+                                    Policies
+                                </Link>
                                 <button className="dropdown-item danger" onClick={logout}>
                                     Sign Out
                                 </button>

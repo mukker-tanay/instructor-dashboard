@@ -12,13 +12,7 @@ interface UnavailModalProps {
     onSuccess: () => void;
 }
 
-const APPROVER_OPTIONS = [
-    "Shivank Agrawal",
-    "Shubham Yadav",
-    "Vilas Varghese",
-    "Ayush Raj",
-    "Yogesh K"
-];
+
 
 const UnavailabilityModal: React.FC<UnavailModalProps> = ({ cls, isOpen, onClose, onSuccess }) => {
     const [reason, setReason] = useState('');
@@ -27,18 +21,17 @@ const UnavailabilityModal: React.FC<UnavailModalProps> = ({ cls, isOpen, onClose
     const [teachingPace, setTeachingPace] = useState('');
     const [suggestedReplacement, setSuggestedReplacement] = useState('');
     const [otherComments, setOtherComments] = useState('');
-    const [approvers, setApprovers] = useState<string[]>([]);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
 
     const resetForm = () => {
         setReason(''); setTopics(''); setBatchPulse(''); setTeachingPace('');
-        setSuggestedReplacement(''); setOtherComments(''); setApprovers([]); setError('');
+        setSuggestedReplacement(''); setOtherComments(''); setError('');
     };
 
     const handleSubmit = async () => {
-        if (!reason || !topics || !batchPulse || !teachingPace || approvers.length === 0) {
-            setError('Please fill all mandatory fields and select at least one approver.');
+        if (!reason || !topics || !batchPulse || !teachingPace) {
+            setError('Please fill all mandatory fields.');
             return;
         }
         setSubmitting(true);
@@ -52,7 +45,6 @@ const UnavailabilityModal: React.FC<UnavailModalProps> = ({ cls, isOpen, onClose
                 teaching_pace_style: teachingPace,
                 suggested_replacement: suggestedReplacement,
                 other_comments: otherComments,
-                approvers,
             });
             resetForm();
             onSuccess();
@@ -106,36 +98,6 @@ const UnavailabilityModal: React.FC<UnavailModalProps> = ({ cls, isOpen, onClose
                 <textarea className="form-textarea" value={otherComments} onChange={e => setOtherComments(e.target.value)} placeholder="Optional" />
             </div>
 
-            <div className="form-group">
-                <label className="form-label form-label-required">Select Approvers</label>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
-                    {APPROVER_OPTIONS.map(name => {
-                        const isSelected = approvers.includes(name);
-                        return (
-                            <div
-                                key={name}
-                                onClick={() => {
-                                    if (isSelected) setApprovers(prev => prev.filter(n => n !== name));
-                                    else setApprovers(prev => [...prev, name]);
-                                }}
-                                style={{
-                                    padding: '6px 12px',
-                                    borderRadius: '20px',
-                                    fontSize: '0.8125rem',
-                                    cursor: 'pointer',
-                                    border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border)',
-                                    background: isSelected ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-secondary)',
-                                    color: isSelected ? 'var(--primary)' : 'var(--text-primary)',
-                                    transition: 'all 0.2s',
-                                    fontWeight: isSelected ? 500 : 400,
-                                }}
-                            >
-                                {name}
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
 
             <div className="modal-actions">
                 <button className="btn btn-secondary" onClick={handleClose}>Cancel</button>
@@ -255,6 +217,15 @@ const generateTimeSlots = (): string[] => {
     return slots;
 };
 const TIME_SLOTS = generateTimeSlots();
+
+/* ─── Approver options (used in Class Addition) ─── */
+const APPROVER_OPTIONS = [
+    "Shivank Agrawal",
+    "Shubham Yadav",
+    "Vilas Varghese",
+    "Ayush Raj",
+    "Yogesh K"
+];
 
 /* ─── Class Addition Modal ─── */
 interface ClassAddModalProps {
@@ -702,11 +673,12 @@ const ClassCard: React.FC<ClassCardProps> = ({ cls, index, isPast, hasExistingRe
     );
 };
 
-/* ─── Calendar Picker ─── */
+/* ─── Calendar Picker (range) ─── */
+interface DateRange { start: string; end: string; }  // MM/DD/YYYY
 interface CalendarPickerProps {
-    selectedDates: string[];   // MM/DD/YYYY
+    range: DateRange | null;
     classDates: Set<string>;   // MM/DD/YYYY – dates that have at least one class
-    onChange: (dates: string[]) => void;
+    onChange: (range: DateRange | null) => void;
 }
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June',
@@ -716,9 +688,17 @@ const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 const toMMDDYYYY = (y: number, m: number, d: number) =>
     `${String(m + 1).padStart(2, '0')}/${String(d).padStart(2, '0')}/${y}`;
 
-const CalendarPicker: React.FC<CalendarPickerProps> = ({ selectedDates, classDates, onChange }) => {
+const mmddyyyyToTs = (s: string): number => {
+    const [m, d, y] = s.split('/').map(Number);
+    return new Date(y, m - 1, d).getTime();
+};
+
+const CalendarPicker: React.FC<CalendarPickerProps> = ({ range, classDates, onChange }) => {
     const today = new Date();
     const [view, setView] = useState({ year: today.getFullYear(), month: today.getMonth() });
+    // pending = first click placed, waiting for second
+    const [pending, setPending] = useState<string | null>(null);
+    const [hovered, setHovered] = useState<string | null>(null);
 
     const firstDayOfWeek = new Date(view.year, view.month, 1).getDay();
     const daysInMonth = new Date(view.year, view.month + 1, 0).getDate();
@@ -726,15 +706,50 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({ selectedDates, classDat
     const prev = () => setView(v => v.month === 0 ? { year: v.year - 1, month: 11 } : { ...v, month: v.month - 1 });
     const next = () => setView(v => v.month === 11 ? { year: v.year + 1, month: 0 } : { ...v, month: v.month + 1 });
 
-    const toggleDay = (dateStr: string) =>
-        onChange(selectedDates.includes(dateStr) ? selectedDates.filter(d => d !== dateStr) : [...selectedDates, dateStr]);
+    const handleClick = (dateStr: string) => {
+        if (!pending) {
+            // first click — start a new range
+            setPending(dateStr);
+            onChange(null);
+        } else if (dateStr === pending) {
+            // clicking the same day cancels
+            setPending(null);
+        } else {
+            // second click — commit range
+            const a = mmddyyyyToTs(pending);
+            const b = mmddyyyyToTs(dateStr);
+            const [s, e] = a <= b ? [pending, dateStr] : [dateStr, pending];
+            onChange({ start: s, end: e });
+            setPending(null);
+            setHovered(null);
+        }
+    };
 
     const todayStr = toMMDDYYYY(today.getFullYear(), today.getMonth(), today.getDate());
+
+    // effective range for highlighting (committed or preview)
+    const previewEnd = pending && hovered ? hovered : null;
+    const rangeStart = range?.start ?? (pending && previewEnd
+        ? (mmddyyyyToTs(pending) <= mmddyyyyToTs(previewEnd) ? pending : previewEnd)
+        : pending) ?? null;
+    const rangeEnd = range?.end ?? (pending && previewEnd
+        ? (mmddyyyyToTs(pending) <= mmddyyyyToTs(previewEnd) ? previewEnd : pending)
+        : null) ?? null;
+
+    const inRange = (dateStr: string) => {
+        if (!rangeStart || !rangeEnd) return false;
+        const ts = mmddyyyyToTs(dateStr);
+        return ts >= mmddyyyyToTs(rangeStart) && ts <= mmddyyyyToTs(rangeEnd);
+    };
 
     const cells: (number | null)[] = [
         ...Array(firstDayOfWeek).fill(null),
         ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
     ];
+
+    const rangeLabel = range
+        ? `${range.start} – ${range.end}`
+        : pending ? `${pending} → select end date` : null;
 
     return (
         <div style={{
@@ -749,6 +764,10 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({ selectedDates, classDat
                 </span>
                 <button onClick={next} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '1rem', padding: '0 4px' }}>›</button>
             </div>
+            {/* Hint */}
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '8px', minHeight: '16px' }}>
+                {pending && !range ? 'Now click an end date' : !pending && !range ? 'Click a start date' : ''}
+            </div>
             {/* Day-of-week headers */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 32px)', gap: '2px', marginBottom: '4px' }}>
                 {DAY_LABELS.map(l => (
@@ -761,30 +780,38 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({ selectedDates, classDat
                     if (!day) return <div key={`e-${idx}`} />;
                     const dateStr = toMMDDYYYY(view.year, view.month, day);
                     const hasClass = classDates.has(dateStr);
-                    const isSelected = selectedDates.includes(dateStr);
+                    const isStart = dateStr === rangeStart;
+                    const isEnd = dateStr === rangeEnd;
+                    const isMid = inRange(dateStr) && !isStart && !isEnd;
+                    const isEndpoint = isStart || isEnd;
                     const isToday = dateStr === todayStr;
+                    const isPending = dateStr === pending && !range;
                     return (
                         <div
                             key={dateStr}
-                            onClick={() => toggleDay(dateStr)}
+                            onClick={() => handleClick(dateStr)}
+                            onMouseEnter={() => pending && setHovered(dateStr)}
+                            onMouseLeave={() => setHovered(null)}
                             style={{
-                                width: '32px', height: '32px', display: 'flex', flexDirection: 'column',
+                                width: '32px', height: '32px', display: 'flex',
                                 alignItems: 'center', justifyContent: 'center', borderRadius: '6px',
-                                cursor: hasClass ? 'pointer' : 'default',
+                                cursor: 'pointer',
                                 fontSize: '0.8125rem', fontWeight: isToday ? 700 : 400,
                                 position: 'relative',
-                                background: isSelected
+                                background: isEndpoint || isPending
                                     ? 'var(--accent-primary)'
-                                    : isToday
-                                        ? 'rgba(99,102,241,0.1)'
-                                        : 'transparent',
-                                color: isSelected ? '#fff' : hasClass ? 'var(--text-primary)' : 'var(--text-muted)',
-                                transition: 'background 0.12s',
-                                opacity: hasClass ? 1 : 0.4,
+                                    : isMid
+                                        ? 'rgba(99,102,241,0.18)'
+                                        : isToday
+                                            ? 'rgba(99,102,241,0.08)'
+                                            : 'transparent',
+                                color: isEndpoint || isPending ? '#fff' : hasClass ? 'var(--text-primary)' : 'var(--text-muted)',
+                                opacity: hasClass ? 1 : 0.35,
+                                transition: 'background 0.1s',
                             }}
                         >
                             {day}
-                            {hasClass && !isSelected && (
+                            {hasClass && !isEndpoint && !isMid && !isPending && (
                                 <span style={{
                                     position: 'absolute', bottom: '3px', left: '50%', transform: 'translateX(-50%)',
                                     width: '4px', height: '4px', borderRadius: '50%',
@@ -795,23 +822,19 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({ selectedDates, classDat
                     );
                 })}
             </div>
-            {/* Selected date chips */}
-            {selectedDates.length > 0 && (
-                <div style={{ marginTop: '10px', display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                    {selectedDates.map(d => (
-                        <span key={d} style={{
-                            display: 'inline-flex', alignItems: 'center', gap: '4px',
-                            padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem',
-                            background: 'rgba(99,102,241,0.12)', color: 'var(--accent-primary)', fontWeight: 500,
-                        }}>
-                            {d}
-                            <span onClick={() => onChange(selectedDates.filter(x => x !== d))} style={{ cursor: 'pointer', lineHeight: 1 }}>×</span>
-                        </span>
-                    ))}
-                    <span onClick={() => onChange([])} style={{
-                        cursor: 'pointer', fontSize: '0.75rem', color: 'var(--text-muted)',
-                        padding: '2px 6px', alignSelf: 'center',
-                    }}>clear</span>
+            {/* Range label + clear */}
+            {rangeLabel && (
+                <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{
+                        padding: '3px 10px', borderRadius: '12px', fontSize: '0.75rem',
+                        background: 'rgba(99,102,241,0.12)', color: 'var(--accent-primary)', fontWeight: 500,
+                    }}>{rangeLabel}</span>
+                    {range && (
+                        <span
+                            onClick={() => { onChange(null); setPending(null); }}
+                            style={{ cursor: 'pointer', fontSize: '0.75rem', color: 'var(--text-muted)' }}
+                        >clear</span>
+                    )}
                 </div>
             )}
         </div>
@@ -834,7 +857,7 @@ const InstructorDashboard: React.FC = () => {
 
     // Filters
     const [filterBatch, setFilterBatch] = useState('');
-    const [filterDates, setFilterDates] = useState<string[]>([]);   // MM/DD/YYYY, multi-select
+    const [filterDateRange, setFilterDateRange] = useState<DateRange | null>(null);
     const [filterModule, setFilterModule] = useState('');
     const [filterTime, setFilterTime] = useState<'' | 'morning' | 'evening'>();
     const [showCal, setShowCal] = useState(false);
@@ -899,7 +922,14 @@ const InstructorDashboard: React.FC = () => {
     const applyFilters = (classes: ClassItem[]) => {
         let result = classes;
         if (filterBatch) result = result.filter(c => String(c['Batch Name'] || '') === filterBatch);
-        if (filterDates.length > 0) result = result.filter(c => filterDates.includes(String(c['Date of Class (MM/DD/YYYY)'] || '').trim()));
+        if (filterDateRange) {
+            const startTs = mmddyyyyToTs(filterDateRange.start);
+            const endTs = mmddyyyyToTs(filterDateRange.end);
+            result = result.filter(c => {
+                const ts = mmddyyyyToTs(String(c['Date of Class (MM/DD/YYYY)'] || '').trim());
+                return ts >= startTs && ts <= endTs;
+            });
+        }
         if (filterModule) result = result.filter(c => String(c['Module Name'] || '') === filterModule);
         if (filterTime) {
             result = result.filter(c => {
@@ -985,7 +1015,7 @@ const InstructorDashboard: React.FC = () => {
                                     transition: 'all 0.15s',
                                 }}
                             >
-                                {slot === 'morning' ? '☀ Morning' : '🌙 Evening'}
+                                {slot === 'morning' ? 'Morning' : 'Evening'}
                             </button>
                         ))}
                     </div>
@@ -994,25 +1024,25 @@ const InstructorDashboard: React.FC = () => {
                         onClick={() => setShowCal(p => !p)}
                         style={{
                             padding: '5px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-light)',
-                            background: filterDates.length > 0 ? 'rgba(99,102,241,0.12)' : 'var(--bg-input)',
-                            color: filterDates.length > 0 ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                            fontWeight: filterDates.length > 0 ? 600 : 400, cursor: 'pointer', fontSize: '0.8125rem',
+                            background: filterDateRange ? 'rgba(99,102,241,0.12)' : 'var(--bg-input)',
+                            color: filterDateRange ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                            fontWeight: filterDateRange ? 600 : 400, cursor: 'pointer', fontSize: '0.8125rem',
                             fontFamily: 'inherit', transition: 'all 0.15s',
                         }}
                     >
-                        📅 {filterDates.length > 0 ? `${filterDates.length} date${filterDates.length > 1 ? 's' : ''}` : 'Date'}
+                        {filterDateRange ? `${filterDateRange.start} – ${filterDateRange.end}` : 'Date range'}
                     </button>
                     {/* Clear all */}
-                    {(filterBatch || filterDates.length > 0 || filterModule || filterTime) && (
-                        <button className="btn btn-sm btn-ghost" onClick={() => { setFilterBatch(''); setFilterDates([]); setFilterModule(''); setFilterTime(''); }}>Clear all</button>
+                    {(filterBatch || filterDateRange || filterModule || filterTime) && (
+                        <button className="btn btn-sm btn-ghost" onClick={() => { setFilterBatch(''); setFilterDateRange(null); setFilterModule(''); setFilterTime(''); }}>Clear all</button>
                     )}
                 </div>
                 {/* Inline calendar */}
                 {showCal && (
                     <CalendarPicker
-                        selectedDates={filterDates}
+                        range={filterDateRange}
                         classDates={classDatesSet}
-                        onChange={setFilterDates}
+                        onChange={setFilterDateRange}
                     />
                 )}
             </div>
