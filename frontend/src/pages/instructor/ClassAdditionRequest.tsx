@@ -50,16 +50,13 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({ options, value,
                     cursor: disabled ? 'not-allowed' : 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'space-between',
                     userSelect: 'none',
                     opacity: disabled ? 0.6 : 1,
-                    gap: '8px',
                 }}
             >
-                <span style={{ color: value ? 'var(--text-primary)' : 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <span style={{ color: value ? 'var(--text-primary)' : 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
                     {value || placeholder}
                 </span>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', flexShrink: 0 }}>▼</span>
             </div>
             {open && (
                 <div style={{
@@ -73,7 +70,7 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({ options, value,
                         <input
                             autoFocus
                             className="form-input"
-                            style={{ padding: '6px 10px', fontSize: '0.8125rem', margin: 0 }}
+                            style={{ padding: '6px 10px', fontSize: '0.8125rem', margin: 0, backgroundImage: 'none' }}
                             placeholder="Search..."
                             value={query}
                             onChange={e => setQuery(e.target.value)}
@@ -268,7 +265,7 @@ const ClassAdditionRequest: React.FC = () => {
                             value={form.program}
                             readOnly
                             placeholder="Auto-filled from batch"
-                            style={{ background: 'var(--bg-secondary)', cursor: 'not-allowed', color: form.program ? 'var(--text-primary)' : 'var(--text-muted)' }}
+                            style={{ background: 'var(--bg-secondary)', cursor: 'not-allowed', color: form.program ? 'var(--text-primary)' : 'var(--text-muted)', backgroundImage: 'none' }}
                         />
                     </div>
                 </div>
@@ -292,6 +289,7 @@ const ClassAdditionRequest: React.FC = () => {
                             value={form.class_title}
                             onChange={e => update('class_title', e.target.value)}
                             placeholder="Enter class title"
+                            style={{ backgroundImage: 'none' }}
                         />
                     </div>
                 </div>
@@ -306,7 +304,7 @@ const ClassAdditionRequest: React.FC = () => {
                                 type="date"
                                 value={form.date_of_class}
                                 onChange={e => update('date_of_class', e.target.value)}
-                                style={{ paddingRight: form.date_of_class ? '90px' : undefined }}
+                                style={{ backgroundImage: 'none', paddingRight: form.date_of_class ? '90px' : undefined }}
                             />
                             {form.date_of_class && (
                                 <span style={{
@@ -333,14 +331,14 @@ const ClassAdditionRequest: React.FC = () => {
                 <div className="form-row">
                     <div className="form-group">
                         <label className="form-label">Class Type</label>
-                        <select className="form-select" value={form.class_type} onChange={e => update('class_type', e.target.value)}>
+                        <select className="form-select" style={{ appearance: 'none' }} value={form.class_type} onChange={e => update('class_type', e.target.value)}>
                             <option value="Regular">Regular</option>
                             <option value="Optional">Optional</option>
                         </select>
                     </div>
                     <div className="form-group">
                         <label className="form-label">Shift Other Classes by 1</label>
-                        <select className="form-select" value={form.shift_other_classes} onChange={e => update('shift_other_classes', e.target.value)}>
+                        <select className="form-select" style={{ appearance: 'none' }} value={form.shift_other_classes} onChange={e => update('shift_other_classes', e.target.value)}>
                             <option value="No">No</option>
                             <option value="Yes">Yes</option>
                         </select>
@@ -350,7 +348,7 @@ const ClassAdditionRequest: React.FC = () => {
                 {/* Assignment & Homework */}
                 <div className="form-group">
                     <label className="form-label">Assignment &amp; Homework Requirement</label>
-                    <select className="form-select" value={form.assignment_requirement} onChange={e => update('assignment_requirement', e.target.value)}>
+                    <select className="form-select" style={{ appearance: 'none' }} value={form.assignment_requirement} onChange={e => update('assignment_requirement', e.target.value)}>
                         <option value="None">None</option>
                         <option value="Assignment">Assignment</option>
                         <option value="Homework">Homework</option>
