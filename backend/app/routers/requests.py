@@ -144,7 +144,7 @@ async def create_unavailability_request(
             "classroom_program", "dsml-ops-group",
         ]
 
-        all_mapping_records = sheets_service.get_all_records("ID mapping")
+        all_mapping_records = await asyncio.to_thread(sheets_service.get_all_records, "ID mapping")
 
         def get_slack_tag(name: str) -> str:
             clean_name = name.strip().lower()
@@ -247,7 +247,7 @@ async def create_class_addition_request(
         "loco-program-team",
     ]
 
-    all_mapping_records = sheets_service.get_all_records("ID mapping")
+    all_mapping_records = await asyncio.to_thread(sheets_service.get_all_records, "ID mapping")
 
     def get_slack_tag(name: str) -> str:
         clean_name = name.strip().lower()

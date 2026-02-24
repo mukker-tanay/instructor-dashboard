@@ -12,11 +12,11 @@ logger = logging.getLogger(__name__)
 async def send_slack_notification(message: str, thread_ts: str = None) -> str:
     """
     Post a message to Slack via Bot API (chat.postMessage).
+    Uses Block Kit sections for reliable mrkdwn (bold/italic) rendering.
     Returns the 'ts' of the sent message (or empty string on failure).
     """
     # Fallback to webhook if bot token not set (for backward compatibility)
     if not settings.slack_bot_token and settings.slack_webhook_url and not thread_ts:
-        # Webhooks don't support threading reliably in this context
         await _send_via_webhook(message)
         return ""
 
@@ -24,11 +24,20 @@ async def send_slack_notification(message: str, thread_ts: str = None) -> str:
         logger.warning("Slack Bot Token or Channel ID not configured; skipping.")
         return ""
 
+    # Build blocks — split at 2900 chars to stay under Slack's 3000-char limit per block
+    BLOCK_LIMIT = 2900
+    chunks = [message[i:i + BLOCK_LIMIT] for i in range(0, len(message), BLOCK_LIMIT)]
+    blocks = [
+        {"type": "section", "text": {"type": "mrkdwn", "text": chunk}}
+        for chunk in chunks
+    ]
+
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             payload = {
                 "channel": settings.slack_channel_id,
-                "text": message,
+                "text": message[:150],   # plain-text fallback (push notifications, etc.)
+                "blocks": blocks,
             }
             if thread_ts:
                 payload["thread_ts"] = thread_ts
@@ -42,7 +51,7 @@ async def send_slack_notification(message: str, thread_ts: str = None) -> str:
             if not data.get("ok"):
                 logger.error(f"Slack API error: {data.get('error')}")
                 return ""
-            
+
             return data.get("ts", "")
     except Exception as e:
         logger.error(f"Slack notification failed: {e}")
