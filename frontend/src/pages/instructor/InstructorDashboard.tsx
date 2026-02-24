@@ -702,6 +702,122 @@ const ClassCard: React.FC<ClassCardProps> = ({ cls, index, isPast, hasExistingRe
     );
 };
 
+/* ─── Calendar Picker ─── */
+interface CalendarPickerProps {
+    selectedDates: string[];   // MM/DD/YYYY
+    classDates: Set<string>;   // MM/DD/YYYY – dates that have at least one class
+    onChange: (dates: string[]) => void;
+}
+
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'];
+const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+
+const toMMDDYYYY = (y: number, m: number, d: number) =>
+    `${String(m + 1).padStart(2, '0')}/${String(d).padStart(2, '0')}/${y}`;
+
+const CalendarPicker: React.FC<CalendarPickerProps> = ({ selectedDates, classDates, onChange }) => {
+    const today = new Date();
+    const [view, setView] = useState({ year: today.getFullYear(), month: today.getMonth() });
+
+    const firstDayOfWeek = new Date(view.year, view.month, 1).getDay();
+    const daysInMonth = new Date(view.year, view.month + 1, 0).getDate();
+
+    const prev = () => setView(v => v.month === 0 ? { year: v.year - 1, month: 11 } : { ...v, month: v.month - 1 });
+    const next = () => setView(v => v.month === 11 ? { year: v.year + 1, month: 0 } : { ...v, month: v.month + 1 });
+
+    const toggleDay = (dateStr: string) =>
+        onChange(selectedDates.includes(dateStr) ? selectedDates.filter(d => d !== dateStr) : [...selectedDates, dateStr]);
+
+    const todayStr = toMMDDYYYY(today.getFullYear(), today.getMonth(), today.getDate());
+
+    const cells: (number | null)[] = [
+        ...Array(firstDayOfWeek).fill(null),
+        ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+    ];
+
+    return (
+        <div style={{
+            background: 'var(--bg-card)', border: '1px solid var(--border-light)',
+            borderRadius: 'var(--radius-md)', padding: '12px 14px', width: 'fit-content',
+        }}>
+            {/* Month navigation */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', gap: '12px' }}>
+                <button onClick={prev} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '1rem', padding: '0 4px' }}>‹</button>
+                <span style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-primary)' }}>
+                    {MONTH_NAMES[view.month]} {view.year}
+                </span>
+                <button onClick={next} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '1rem', padding: '0 4px' }}>›</button>
+            </div>
+            {/* Day-of-week headers */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 32px)', gap: '2px', marginBottom: '4px' }}>
+                {DAY_LABELS.map(l => (
+                    <div key={l} style={{ textAlign: 'center', fontSize: '0.6875rem', fontWeight: 600, color: 'var(--text-muted)', padding: '2px 0' }}>{l}</div>
+                ))}
+            </div>
+            {/* Day cells */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 32px)', gap: '2px' }}>
+                {cells.map((day, idx) => {
+                    if (!day) return <div key={`e-${idx}`} />;
+                    const dateStr = toMMDDYYYY(view.year, view.month, day);
+                    const hasClass = classDates.has(dateStr);
+                    const isSelected = selectedDates.includes(dateStr);
+                    const isToday = dateStr === todayStr;
+                    return (
+                        <div
+                            key={dateStr}
+                            onClick={() => toggleDay(dateStr)}
+                            style={{
+                                width: '32px', height: '32px', display: 'flex', flexDirection: 'column',
+                                alignItems: 'center', justifyContent: 'center', borderRadius: '6px',
+                                cursor: hasClass ? 'pointer' : 'default',
+                                fontSize: '0.8125rem', fontWeight: isToday ? 700 : 400,
+                                position: 'relative',
+                                background: isSelected
+                                    ? 'var(--accent-primary)'
+                                    : isToday
+                                        ? 'rgba(99,102,241,0.1)'
+                                        : 'transparent',
+                                color: isSelected ? '#fff' : hasClass ? 'var(--text-primary)' : 'var(--text-muted)',
+                                transition: 'background 0.12s',
+                                opacity: hasClass ? 1 : 0.4,
+                            }}
+                        >
+                            {day}
+                            {hasClass && !isSelected && (
+                                <span style={{
+                                    position: 'absolute', bottom: '3px', left: '50%', transform: 'translateX(-50%)',
+                                    width: '4px', height: '4px', borderRadius: '50%',
+                                    background: 'var(--accent-primary)',
+                                }} />
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+            {/* Selected date chips */}
+            {selectedDates.length > 0 && (
+                <div style={{ marginTop: '10px', display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                    {selectedDates.map(d => (
+                        <span key={d} style={{
+                            display: 'inline-flex', alignItems: 'center', gap: '4px',
+                            padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem',
+                            background: 'rgba(99,102,241,0.12)', color: 'var(--accent-primary)', fontWeight: 500,
+                        }}>
+                            {d}
+                            <span onClick={() => onChange(selectedDates.filter(x => x !== d))} style={{ cursor: 'pointer', lineHeight: 1 }}>×</span>
+                        </span>
+                    ))}
+                    <span onClick={() => onChange([])} style={{
+                        cursor: 'pointer', fontSize: '0.75rem', color: 'var(--text-muted)',
+                        padding: '2px 6px', alignSelf: 'center',
+                    }}>clear</span>
+                </div>
+            )}
+        </div>
+    );
+};
+
 /* ─── Main Dashboard ─── */
 const InstructorDashboard: React.FC = () => {
     const [upcoming, setUpcoming] = useState<ClassItem[]>([]);
@@ -718,8 +834,10 @@ const InstructorDashboard: React.FC = () => {
 
     // Filters
     const [filterBatch, setFilterBatch] = useState('');
-    const [filterDate, setFilterDate] = useState('');
+    const [filterDates, setFilterDates] = useState<string[]>([]);   // MM/DD/YYYY, multi-select
     const [filterModule, setFilterModule] = useState('');
+    const [filterTime, setFilterTime] = useState<'' | 'morning' | 'evening'>();
+    const [showCal, setShowCal] = useState(false);
 
     // Unavailability modal state
     const [unavailClass, setUnavailClass] = useState<ClassItem | null>(null);
@@ -781,34 +899,25 @@ const InstructorDashboard: React.FC = () => {
     const applyFilters = (classes: ClassItem[]) => {
         let result = classes;
         if (filterBatch) result = result.filter(c => String(c['Batch Name'] || '') === filterBatch);
-        if (filterDate) result = result.filter(c => String(c['Date of Class (MM/DD/YYYY)'] || '') === filterDate);
+        if (filterDates.length > 0) result = result.filter(c => filterDates.includes(String(c['Date of Class (MM/DD/YYYY)'] || '').trim()));
         if (filterModule) result = result.filter(c => String(c['Module Name'] || '') === filterModule);
+        if (filterTime) {
+            result = result.filter(c => {
+                const t = String(c['Time of Class (HH:MM AM/PM) IST'] || '').toUpperCase();
+                return filterTime === 'morning' ? t.includes('AM') : t.includes('PM');
+            });
+        }
         return result;
     };
 
     const filteredUpcoming = applyFilters(upcoming);
     const filteredPast = applyFilters(pastRecent);
 
-    // Derive unique filter options based on OTHER selections (Facet logic)
+    // Derive unique filter options
     const allClasses = [...upcoming, ...pastRecent];
-
-    const getAvailableOptions = (exclude: 'batch' | 'date' | 'module') => {
-        let result = allClasses;
-        if (exclude !== 'batch' && filterBatch) {
-            result = result.filter(c => String(c['Batch Name'] || '') === filterBatch);
-        }
-        if (exclude !== 'date' && filterDate) {
-            result = result.filter(c => String(c['Date of Class (MM/DD/YYYY)'] || '') === filterDate);
-        }
-        if (exclude !== 'module' && filterModule) {
-            result = result.filter(c => String(c['Module Name'] || '') === filterModule);
-        }
-        return result;
-    };
-
-    const uniqueBatches = [...new Set(getAvailableOptions('batch').map(c => String(c['Batch Name'] || '').trim()).filter(Boolean))].sort();
-    const uniqueDates = [...new Set(getAvailableOptions('date').map(c => String(c['Date of Class (MM/DD/YYYY)'] || '').trim()).filter(Boolean))].sort();
-    const uniqueModules = [...new Set(getAvailableOptions('module').map(c => String(c['Module Name'] || '').trim()).filter(Boolean))].sort();
+    const uniqueBatches = [...new Set(allClasses.map(c => String(c['Batch Name'] || '').trim()).filter(Boolean))].sort();
+    const classDatesSet = new Set(allClasses.map(c => String(c['Date of Class (MM/DD/YYYY)'] || '').trim()).filter(Boolean));
+    const uniqueModules = [...new Set(allClasses.map(c => String(c['Module Name'] || '').trim()).filter(Boolean))].sort();
 
     if (loading) {
         return (
@@ -850,21 +959,61 @@ const InstructorDashboard: React.FC = () => {
             </div>
 
             {/* Filters */}
-            <div className="filters-bar">
-                <select className="filter-select" value={filterBatch} onChange={e => setFilterBatch(e.target.value)}>
-                    <option value="">All Batches</option>
-                    {uniqueBatches.map(b => <option key={b} value={b}>{b.length > 50 ? b.slice(0, 50) + '…' : b}</option>)}
-                </select>
-                <select className="filter-select" value={filterDate} onChange={e => setFilterDate(e.target.value)}>
-                    <option value="">All Dates</option>
-                    {uniqueDates.map(d => <option key={d} value={d}>{d}</option>)}
-                </select>
-                <select className="filter-select" value={filterModule} onChange={e => setFilterModule(e.target.value)}>
-                    <option value="">All Modules</option>
-                    {uniqueModules.map(m => <option key={m} value={m}>{m.length > 50 ? m.slice(0, 50) + '…' : m}</option>)}
-                </select>
-                {(filterBatch || filterDate || filterModule) && (
-                    <button className="btn btn-sm btn-ghost" onClick={() => { setFilterBatch(''); setFilterDate(''); setFilterModule(''); }}>Clear</button>
+            <div className="filters-bar" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 'var(--space-sm)' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-sm)', alignItems: 'center' }}>
+                    {/* Batch */}
+                    <select className="filter-select" value={filterBatch} onChange={e => setFilterBatch(e.target.value)}>
+                        <option value="">All Batches</option>
+                        {uniqueBatches.map(b => <option key={b} value={b}>{b.length > 50 ? b.slice(0, 50) + '…' : b}</option>)}
+                    </select>
+                    {/* Module */}
+                    <select className="filter-select" value={filterModule} onChange={e => setFilterModule(e.target.value)}>
+                        <option value="">All Modules</option>
+                        {uniqueModules.map(m => <option key={m} value={m}>{m.length > 50 ? m.slice(0, 50) + '…' : m}</option>)}
+                    </select>
+                    {/* Morning / Evening toggle */}
+                    <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-input)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', padding: '3px' }}>
+                        {(['morning', 'evening'] as const).map(slot => (
+                            <button
+                                key={slot}
+                                onClick={() => setFilterTime(prev => prev === slot ? '' : slot)}
+                                style={{
+                                    padding: '4px 12px', borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer',
+                                    fontSize: '0.8125rem', fontWeight: 500, fontFamily: 'inherit',
+                                    background: filterTime === slot ? 'var(--accent-primary)' : 'transparent',
+                                    color: filterTime === slot ? '#fff' : 'var(--text-secondary)',
+                                    transition: 'all 0.15s',
+                                }}
+                            >
+                                {slot === 'morning' ? '☀ Morning' : '🌙 Evening'}
+                            </button>
+                        ))}
+                    </div>
+                    {/* Date toggle pill */}
+                    <button
+                        onClick={() => setShowCal(p => !p)}
+                        style={{
+                            padding: '5px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-light)',
+                            background: filterDates.length > 0 ? 'rgba(99,102,241,0.12)' : 'var(--bg-input)',
+                            color: filterDates.length > 0 ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                            fontWeight: filterDates.length > 0 ? 600 : 400, cursor: 'pointer', fontSize: '0.8125rem',
+                            fontFamily: 'inherit', transition: 'all 0.15s',
+                        }}
+                    >
+                        📅 {filterDates.length > 0 ? `${filterDates.length} date${filterDates.length > 1 ? 's' : ''}` : 'Date'}
+                    </button>
+                    {/* Clear all */}
+                    {(filterBatch || filterDates.length > 0 || filterModule || filterTime) && (
+                        <button className="btn btn-sm btn-ghost" onClick={() => { setFilterBatch(''); setFilterDates([]); setFilterModule(''); setFilterTime(''); }}>Clear all</button>
+                    )}
+                </div>
+                {/* Inline calendar */}
+                {showCal && (
+                    <CalendarPicker
+                        selectedDates={filterDates}
+                        classDates={classDatesSet}
+                        onChange={setFilterDates}
+                    />
                 )}
             </div>
 
