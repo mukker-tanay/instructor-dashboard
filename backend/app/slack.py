@@ -1,4 +1,4 @@
-"""Async Slack notifications — uses attachments with mrkdwn_in for reliable bold rendering."""
+"""Async Slack notifications — fire-and-forget."""
 
 import asyncio
 import httpx
@@ -9,32 +9,27 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 
-def _build_payload(message: str, channel: str, thread_ts: str = None) -> dict:
-    """Build a chat.postMessage payload using attachments + mrkdwn_in for reliable mrkdwn."""
-    payload: dict = {
-        "channel": channel,
-        "text": "",           # empty — content lives in the attachment
-        "attachments": [
-            {
-                "text": message,
-                "mrkdwn_in": ["text"],
-                "fallback": message[:200],
-            }
-        ],
-    }
-    if thread_ts:
-        payload["thread_ts"] = thread_ts
-    return payload
+async def send_workflow_payload(webhook_url: str, data: dict) -> None:
+    """
+    POST a dict of named variables to a Slack Workflow incoming webhook.
+    The Workflow defines the template; this just supplies the values.
+    """
+    if not webhook_url:
+        logger.warning("Slack Workflow webhook URL not configured; skipping.")
+        return
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            await client.post(webhook_url, json=data)
+    except Exception as e:
+        logger.error(f"Slack Workflow webhook failed: {e}")
 
 
 async def send_slack_notification(message: str, thread_ts: str = None) -> str:
     """
-    Post a message to Slack via Bot API (chat.postMessage).
-    Uses attachments with mrkdwn_in so *bold* always renders correctly,
-    including when a Slack Workflow bot re-posts the message.
-    Returns the message 'ts' on success, or empty string on failure.
+    Post a pre-formatted text message via Bot API (chat.postMessage).
+    Falls back to legacy webhook if bot token is not set.
+    Returns the message 'ts' on success.
     """
-    # Fallback to webhook if bot token not set
     if not settings.slack_bot_token and settings.slack_webhook_url and not thread_ts:
         await _send_via_webhook(message)
         return ""
@@ -43,10 +38,16 @@ async def send_slack_notification(message: str, thread_ts: str = None) -> str:
         logger.warning("Slack Bot Token or Channel ID not configured; skipping.")
         return ""
 
-    payload = _build_payload(message, settings.slack_channel_id, thread_ts)
-
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
+            payload: dict = {
+                "channel": settings.slack_channel_id,
+                "text": message,
+                "mrkdwn": True,
+            }
+            if thread_ts:
+                payload["thread_ts"] = thread_ts
+
             resp = await client.post(
                 "https://slack.com/api/chat.postMessage",
                 headers={"Authorization": f"Bearer {settings.slack_bot_token}"},
@@ -63,18 +64,10 @@ async def send_slack_notification(message: str, thread_ts: str = None) -> str:
 
 
 async def _send_via_webhook(message: str) -> None:
-    """Send via incoming webhook — also uses attachments for mrkdwn support."""
-    payload = {
-        "attachments": [
-            {
-                "text": message,
-                "mrkdwn_in": ["text"],
-            }
-        ]
-    }
+    """Send via legacy incoming webhook."""
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            await client.post(settings.slack_webhook_url, json=payload)
+            await client.post(settings.slack_webhook_url, json={"text": message})
     except Exception as e:
         logger.error(f"Slack webhook failed: {e}")
 

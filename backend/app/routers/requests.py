@@ -131,7 +131,7 @@ async def create_unavailability_request(
         await asyncio.to_thread(sheets_service.append_row, UNAVAILABILITY_SHEET, row)
         results.append({"request_id": request_id, "class": cls.get("class_title", cls.get("Class Title", ""))})
 
-        # ─── Slack Notification ───
+        # ─── Slack Workflow Notification ───
         batch_name  = cls.get('batch_name', cls.get('Batch Name', ''))
         program     = cls.get('program', cls.get('Program', ''))
         sbat        = cls.get('sbat_group_id', cls.get('SBAT Group ID', ''))
@@ -139,54 +139,43 @@ async def create_unavailability_request(
         class_title = cls.get('class_title', cls.get('Class Title', ''))
         class_type  = cls.get('class_type', cls.get('Class Type (Regular/Optional)', cls.get('Class Type', '')))
 
-        STANDARD_CC_LIST = [
-            "Amar Srivastava", "Rishabh Gupta", "Vagesh Garg",
-            "classroom_program", "dsml-ops-group",
-        ]
-
+        # Look up raw Slack ID for suggested_replacement (Workflow 'Slack user' variable)
         all_mapping_records = await asyncio.to_thread(sheets_service.get_all_records, "ID mapping")
 
-        def get_slack_tag(name: str) -> str:
-            clean_name = name.strip().lower()
-            member_id = ""
+        def get_slack_id(name: str) -> str:
+            """Return raw Slack member ID for a name, or empty string if not found."""
+            if not name:
+                return ""
+            clean = name.strip().lower()
             for r in all_mapping_records:
-                if str(r.get("Name", "")).strip().lower() == clean_name:
-                    member_id = str(r.get("Member ID", "")).strip()
-                    break
-            if member_id:
-                if member_id.startswith("S"):
-                    return f"<!subteam^{member_id}>"
-                return f"<@{member_id}>"
-            return name
+                if str(r.get("Name", "")).strip().lower() == clean:
+                    return str(r.get("Member ID", "")).strip()
+            return ""
 
-        tagged_ccs = [get_slack_tag(n) for n in STANDARD_CC_LIST]
-        ccs_str = " ".join(tagged_ccs)
+        workflow_data = {
+            "instructor_email":      user.email,
+            "instructor_name":       user.name,
+            "program":               program,
+            "batch_name":            batch_name,
+            "sbat_group_id":         str(sbat),
+            "class_title":           class_title,
+            "module_name":           module,
+            "date_of_class":         date_str,
+            "time_of_class":         time_str,
+            "class_type":            class_type,
+            "reason":                body.reason,
+            "other_comments":        body.other_comments or "",
+            "suggested_replacement": get_slack_id(body.suggested_replacement or ""),
+            "topics_and_promises":   body.topics_and_promises,
+            "batch_pulse_persona":   body.batch_pulse_persona,
+            "teaching_pace_style":   body.teaching_pace_style,
+        }
 
-        slack_msg = (
-            f"*� Instructor Unavailability Request*\n"
-            f"*Instructor Email*\n{user.email}\n"
-            f"*Instructor Name*\n{user.name}\n"
-            f"*Program*\n{program}\n"
-            f"*Batch Name*\n{batch_name}\n"
-            f"*SBAT Group ID*\n{sbat}\n"
-            f"*Class Title*\n{class_title}\n"
-            f"*Module Name*\n{module}\n"
-            f"*Original Date of Class (MM/DD/YYYY)*\n{date_str}\n"
-            f"*Original Time of Class (HH:MM AM/PM) IST*\n{time_str}\n"
-            f"*Class Type*\n{class_type}\n"
-            f"*Reason for Unavailability*\n{body.reason}\n"
-            f"*Any other Comments*\n{body.other_comments or ''}\n"
-            f"*Suggested Instructors for Replacement*\n{body.suggested_replacement or ''}\n"
-            f"*Topics & Promises From Previous Class*\n{body.topics_and_promises}\n"
-            f"*Batch Pulse & Persona*\n{body.batch_pulse_persona}\n"
-            f"*Recommended Teaching Pace & Style*\n{body.teaching_pace_style}\n"
-            f"\ncc: {ccs_str}"
-        )
-
-        _msg = slack_msg  # capture per-iteration value for the closure
-        async def _send_unavail(msg=_msg):
-            from app.slack import send_slack_notification
-            await send_slack_notification(msg)
+        _data = workflow_data  # capture per-iteration value for the closure
+        async def _send_unavail(data=_data):
+            from app.slack import send_workflow_payload
+            from app.config import settings
+            await send_workflow_payload(settings.slack_unavailability_webhook, data)
 
         asyncio.get_running_loop().create_task(_send_unavail())
 
@@ -240,57 +229,45 @@ async def create_class_addition_request(
 
     await asyncio.to_thread(sheets_service.append_row, CLASS_ADDITION_SHEET, row)
 
-    # ─── Slack Notification ───
-    STANDARD_CC_LIST = [
-        "classroom_program", "dsml-ops-group",
-        "Amar Srivastava", "Rishabh Gupta", "Vagesh Garg",
-        "loco-program-team",
-    ]
-
+    # ─── Slack Workflow Notification ───
+    # Look up the approver's raw Slack user ID (Workflow 'Slack user' variable type)
     all_mapping_records = await asyncio.to_thread(sheets_service.get_all_records, "ID mapping")
 
-    def get_slack_tag(name: str) -> str:
-        clean_name = name.strip().lower()
-        member_id = ""
+    def get_slack_id(name: str) -> str:
+        """Return raw Slack member ID for a name, or empty string if not found."""
+        if not name:
+            return ""
+        clean = name.strip().lower()
         for r in all_mapping_records:
-            if str(r.get("Name", "")).strip().lower() == clean_name:
-                member_id = str(r.get("Member ID", "")).strip()
-                break
-        if member_id:
-            if member_id.startswith("S"):
-                return f"<!subteam^{member_id}>"
-            return f"<@{member_id}>"
-        return name
+            if str(r.get("Name", "")).strip().lower() == clean:
+                return str(r.get("Member ID", "")).strip()
+        return ""
 
-    tagged_approvers = [get_slack_tag(name) for name in body.approvers]
-    approvers_str = " ".join(tagged_approvers) if tagged_approvers else "None"
+    # Only the first approver is used (the Workflow variable expects a single user ID)
+    approver_id = get_slack_id(body.approvers[0]) if body.approvers else ""
 
-    tagged_ccs = [get_slack_tag(n) for n in STANDARD_CC_LIST]
-    ccs_str = " ".join(tagged_ccs)
-
-    slack_msg = (
-        f"*� Class Addition Request*\n"
-        f"*Instructor Email*\n{user.email}\n"
-        f"*Instructor Name*\n{user.name}\n"
-        f"*Program*\n{body.program}\n"
-        f"*Batch Name*\n{body.batch_name}\n"
-        f"*Class Title*\n{body.class_title}\n"
-        f"*Module Name*\n{body.module_name}\n"
-        f"*Date of Class (MM/DD/YYYY)*\n{body.date_of_class}\n"
-        f"*Time of Class (HH:MM AM/PM) IST*\n{body.time_of_class}\n"
-        f"*Class Type*\n{body.class_type}\n"
-        f"*Shift other Classes by 1*\n{body.shift_other_classes}\n"
-        f"*Will this addition affect the live contest date?*\n{body.contest_impact}\n"
-        f"*Requirement of Assignment & Homework*\n{body.assignment_requirement}\n"
-        f"*Reason for Addition of Class*\n{body.reason}\n"
-        f"*Other Comments*\n{body.other_comments or ''}\n"
-        f"*Select Approver*\n{approvers_str}\n"
-        f"\ncc: {ccs_str}"
-    )
+    workflow_data = {
+        "instructor_email":       user.email,
+        "instructor_name":        user.name,
+        "program":                body.program,
+        "batch_name":             body.batch_name,
+        "class_title":            body.class_title,
+        "module_name":            body.module_name,
+        "date_of_class":          body.date_of_class,
+        "time_of_class":          body.time_of_class,
+        "class_type":             body.class_type,
+        "shift_other_classes":    body.shift_other_classes,
+        "contest_impact":         body.contest_impact,
+        "assignment_requirement": body.assignment_requirement,
+        "reason":                 body.reason,
+        "other_comments":         body.other_comments or "",
+        "approver":               approver_id,
+    }
 
     async def _send_addition():
-        from app.slack import send_slack_notification
-        await send_slack_notification(slack_msg)
+        from app.slack import send_workflow_payload
+        from app.config import settings
+        await send_workflow_payload(settings.slack_class_addition_webhook, workflow_data)
 
     asyncio.create_task(_send_addition())
 
