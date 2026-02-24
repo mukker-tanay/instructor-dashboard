@@ -11,15 +11,24 @@ logger = logging.getLogger(__name__)
 
 async def send_workflow_payload(webhook_url: str, data: dict) -> None:
     """
-    POST a dict of named variables to a Slack Workflow incoming webhook.
-    The Workflow defines the template; this just supplies the values.
+    POST named variables to a Slack Workflow / Automation trigger webhook.
+    Empty-string and None values are stripped so typed variables (e.g. 'Slack user')
+    don't receive invalid empty payloads, which causes Slack to return 400.
     """
     if not webhook_url:
         logger.warning("Slack Workflow webhook URL not configured; skipping.")
         return
+
+    # Drop keys with empty / None values — Slack uses the variable's default for missing keys
+    clean_data = {k: v for k, v in data.items() if v is not None and v != ""}
+
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            await client.post(webhook_url, json=data)
+            resp = await client.post(webhook_url, json=clean_data)
+            if resp.status_code >= 400:
+                logger.error(
+                    f"Slack Workflow webhook returned {resp.status_code}: {resp.text}"
+                )
     except Exception as e:
         logger.error(f"Slack Workflow webhook failed: {e}")
 
