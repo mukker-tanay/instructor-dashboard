@@ -131,24 +131,21 @@ async def create_unavailability_request(
         await asyncio.to_thread(sheets_service.append_row, UNAVAILABILITY_SHEET, row)
         results.append({"request_id": request_id, "class": cls.get("class_title", cls.get("Class Title", ""))})
 
-        # Build Slack message matching the reference format
-        batch_name = cls.get('batch_name', cls.get('Batch Name', ''))
-        program = cls.get('program', cls.get('Program', ''))
-        sbat = cls.get('sbat_group_id', cls.get('SBAT Group ID', ''))
-        module = cls.get('module_name', cls.get('Module Name', ''))
+        # ─── Slack Notification ───
+        batch_name  = cls.get('batch_name', cls.get('Batch Name', ''))
+        program     = cls.get('program', cls.get('Program', ''))
+        sbat        = cls.get('sbat_group_id', cls.get('SBAT Group ID', ''))
+        module      = cls.get('module_name', cls.get('Module Name', ''))
         class_title = cls.get('class_title', cls.get('Class Title', ''))
-        class_type = cls.get('class_type', cls.get('Class Type (Regular/Optional)', cls.get('Class Type', '')))
+        class_type  = cls.get('class_type', cls.get('Class Type (Regular/Optional)', cls.get('Class Type', '')))
 
-
-        # Standard CC List
         STANDARD_CC_LIST = [
-            "Amar Srivastava", "Rishabh Gupta", "Vagesh Garg", 
-            "classroom_program", "dsml-ops-group"
+            "Amar Srivastava", "Rishabh Gupta", "Vagesh Garg",
+            "classroom_program", "dsml-ops-group",
         ]
 
-        # Helper to lookup IDs and format tags
         all_mapping_records = sheets_service.get_all_records("ID mapping")
-        
+
         def get_slack_tag(name: str) -> str:
             clean_name = name.strip().lower()
             member_id = ""
@@ -156,86 +153,42 @@ async def create_unavailability_request(
                 if str(r.get("Name", "")).strip().lower() == clean_name:
                     member_id = str(r.get("Member ID", "")).strip()
                     break
-            
             if member_id:
-                # User Group IDs usually start with 'S', Users with 'U' or 'W'
                 if member_id.startswith("S"):
-                     return f"<!subteam^{member_id}>"
+                    return f"<!subteam^{member_id}>"
                 return f"<@{member_id}>"
-            return name # Fallback to name
+            return name
 
-        # Tag Approvers
-        tagged_approvers = [get_slack_tag(name) for name in body.approvers]
-        approvers_str = ", ".join(tagged_approvers) if tagged_approvers else "None"
+        tagged_ccs = [get_slack_tag(n) for n in STANDARD_CC_LIST]
+        ccs_str = " ".join(tagged_ccs)
 
-        # Tag CCs
-        tagged_ccs = [get_slack_tag(name) for name in STANDARD_CC_LIST]
-        ccs_str = ", ".join(tagged_ccs)
-
-        # 1. Main Message: Key Info
-        main_msg = (
-            f"🚨 *New Unavailability Request*\n"
-            f"*Class:* {class_title}\n"
-            f"*Instructor:* {user.name} ({user.email})\n"
-            f"*Date:* {date_str} {time_str}\n"
-            f"*Batch:* {batch_name} ({program})\n"
-            f"*Reason:* {body.reason}\n"
-            f"*Approvers:* {approvers_str}\n"
-            f"*CC:* {ccs_str}"
+        slack_msg = (
+            f"*� Instructor Unavailability Request*\n"
+            f"*Instructor Email*\n{user.email}\n"
+            f"*Instructor Name*\n{user.name}\n"
+            f"*Program*\n{program}\n"
+            f"*Batch Name*\n{batch_name}\n"
+            f"*SBAT Group ID*\n{sbat}\n"
+            f"*Class Title*\n{class_title}\n"
+            f"*Module Name*\n{module}\n"
+            f"*Original Date of Class (MM/DD/YYYY)*\n{date_str}\n"
+            f"*Original Time of Class (HH:MM AM/PM) IST*\n{time_str}\n"
+            f"*Class Type*\n{class_type}\n"
+            f"*Reason for Unavailability*\n{body.reason}\n"
+            f"*Any other Comments*\n{body.other_comments or ''}\n"
+            f"*Suggested Instructors for Replacement*\n{body.suggested_replacement or ''}\n"
+            f"*Topics & Promises From Previous Class*\n{body.topics_and_promises}\n"
+            f"*Batch Pulse & Persona*\n{body.batch_pulse_persona}\n"
+            f"*Recommended Teaching Pace & Style*\n{body.teaching_pace_style}\n"
+            f"\ncc: {ccs_str}"
         )
 
-        # 2. Detailed Message (Thread)
-        detail_msg = (
-            f"*Full Details:*\n"
-            f"• *Module:* {module}\n"
-            f"• *SBAT Group:* {sbat}\n"
-            f"• *Class Type:* {class_type}\n"
-            f"• *Other Comments:* {body.other_comments or 'N/A'}\n"
-            f"• *Suggested Replacement:* {body.suggested_replacement or 'N/A'}\n"
-            f"• *Topics & Promises:* {body.topics_and_promises}\n"
-            f"• *Batch Pulse:* {body.batch_pulse_persona}\n"
-            f"• *Teaching Style:* {body.teaching_pace_style}"
-        )
-
-        # Fetch batch metrics
-        try:
-            metrics = await asyncio.to_thread(sheets_service.get_batch_metrics, str(batch_name))
-            if metrics:
-                # Extract values to variables for cleaner f-string
-                nps = metrics.get('Batch NPS', 'N/A')
-                reschedules = metrics.get('Reschedules in this module', 'N/A')
-                break_days = metrics.get('No of break class days', 'N/A')
-                remaining = metrics.get("How many classes are remaining in this module?", "N/A")
-                completed = metrics.get('Classes Completed', 'N/A')
-                ri_count = metrics.get("No of RI's allocated", "N/A")
-                ri_names = metrics.get("RI's Allocated", "N/A")
-
-                detail_msg += (
-                    f"\n\n*Batch Metrics:*\n"
-                    f"Batch NPS: {nps}\n"
-                    f"Number of reschedules in the current module: {reschedules}\n"
-                    f"Number of break days between the end of this module and the start of the next: {break_days} class days\n"
-                    f"How many classes are remaining in this module?: {remaining}\n"
-                    f"Classes completed in this module: {completed}\n"
-                    f"Number of RIs deployed in this module so far, along with names: {ri_count}, {ri_names}"
-                )
-        except Exception:
-            pass
-
-        # Send Main Message -> Get TS -> Send Details in Thread
-        # We need to do this asynchronously but essentially sequentially for this request context
-        # to ensure we have the TS.
-        # Since fire_slack_notification is fire-and-forget, we'll wrap this logic in a small async function
-        # and fire THAT as a background task.
-        
-        async def send_threaded():
+        _msg = slack_msg  # capture per-iteration value for the closure
+        async def _send_unavail(msg=_msg):
             from app.slack import send_slack_notification
-            ts = await send_slack_notification(main_msg)
-            if ts:
-                await send_slack_notification(detail_msg, thread_ts=ts)
-        
-        loop = asyncio.get_running_loop()
-        loop.create_task(send_threaded())
+            await send_slack_notification(msg)
+
+        asyncio.get_running_loop().create_task(_send_unavail())
 
     # Refresh cache after write
     await asyncio.to_thread(cache.force_refresh_requests)
@@ -287,11 +240,15 @@ async def create_class_addition_request(
 
     await asyncio.to_thread(sheets_service.append_row, CLASS_ADDITION_SHEET, row)
 
-    # --- Slack Notification (Bot API with Tagging) ---
-    
-    # Helper to lookup IDs and format tags (Copied from unavailability - ideally refactor to util)
+    # ─── Slack Notification ───
+    STANDARD_CC_LIST = [
+        "classroom_program", "dsml-ops-group",
+        "Amar Srivastava", "Rishabh Gupta", "Vagesh Garg",
+        "loco-program-team",
+    ]
+
     all_mapping_records = sheets_service.get_all_records("ID mapping")
-    
+
     def get_slack_tag(name: str) -> str:
         clean_name = name.strip().lower()
         member_id = ""
@@ -299,47 +256,43 @@ async def create_class_addition_request(
             if str(r.get("Name", "")).strip().lower() == clean_name:
                 member_id = str(r.get("Member ID", "")).strip()
                 break
-        
         if member_id:
             if member_id.startswith("S"):
-                    return f"<!subteam^{member_id}>"
+                return f"<!subteam^{member_id}>"
             return f"<@{member_id}>"
         return name
 
-    STANDARD_CC_LIST = [
-        "Amar Srivastava", "Rishabh Gupta", "Vagesh Garg", 
-        "classroom_program", "dsml-ops-group"
-    ]
-
     tagged_approvers = [get_slack_tag(name) for name in body.approvers]
-    approvers_str = ", ".join(tagged_approvers) if tagged_approvers else "None"
-    
-    tagged_ccs = [get_slack_tag(name) for name in STANDARD_CC_LIST]
-    ccs_str = ", ".join(tagged_ccs)
+    approvers_str = " ".join(tagged_approvers) if tagged_approvers else "None"
+
+    tagged_ccs = [get_slack_tag(n) for n in STANDARD_CC_LIST]
+    ccs_str = " ".join(tagged_ccs)
 
     slack_msg = (
-        f"🚨 *New Class Addition Request*\n"
-        f"*Instructor:* {user.name} ({user.email})\n"
-        f"*Batch:* {body.batch_name} ({body.program})\n"
-        f"*Class:* {body.class_title} ({body.module_name})\n"
-        f"*Proposed Date:* {body.date_of_class} {body.time_of_class}\n"
-        f"*Reason:* {body.reason}\n"
-        f"*Approvers:* {approvers_str}\n"
-        f"*CC:* {ccs_str}\n\n"
-        f"*Details:*\n"
-        f"• Type: {body.class_type}\n"
-        f"• Shift Others: {body.shift_other_classes}\n"
-        f"• Contest Impact: {body.contest_impact}\n"
-        f"• Assignments: {body.assignment_requirement}\n"
-        f"• Comments: {body.other_comments or 'N/A'}"
+        f"*� Class Addition Request*\n"
+        f"*Instructor Email*\n{user.email}\n"
+        f"*Instructor Name*\n{user.name}\n"
+        f"*Program*\n{body.program}\n"
+        f"*Batch Name*\n{body.batch_name}\n"
+        f"*Class Title*\n{body.class_title}\n"
+        f"*Module Name*\n{body.module_name}\n"
+        f"*Date of Class (MM/DD/YYYY)*\n{body.date_of_class}\n"
+        f"*Time of Class (HH:MM AM/PM) IST*\n{body.time_of_class}\n"
+        f"*Class Type*\n{body.class_type}\n"
+        f"*Shift other Classes by 1*\n{body.shift_other_classes}\n"
+        f"*Will this addition affect the live contest date?*\n{body.contest_impact}\n"
+        f"*Requirement of Assignment & Homework*\n{body.assignment_requirement}\n"
+        f"*Reason for Addition of Class*\n{body.reason}\n"
+        f"*Other Comments*\n{body.other_comments or ''}\n"
+        f"*Select Approver*\n{approvers_str}\n"
+        f"\ncc: {ccs_str}"
     )
 
-    # Fire and forget using the Bot API helper
-    async def send_notification():
+    async def _send_addition():
         from app.slack import send_slack_notification
         await send_slack_notification(slack_msg)
 
-    asyncio.create_task(send_notification())
+    asyncio.create_task(_send_addition())
 
     await asyncio.to_thread(cache.force_refresh_requests)
 

@@ -42,7 +42,7 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({ options, value,
     };
 
     return (
-        <div ref={ref} style={{ position: 'relative' }}>
+        <div ref={ref} style={{ position: 'relative', minWidth: 0 }}>
             <div
                 className="form-select"
                 onClick={() => { if (!disabled) setOpen(o => !o); }}
@@ -52,6 +52,7 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({ options, value,
                     alignItems: 'center',
                     userSelect: 'none',
                     opacity: disabled ? 0.6 : 1,
+                    overflow: 'hidden',
                 }}
             >
                 <span style={{ color: value ? 'var(--text-primary)' : 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
