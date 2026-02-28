@@ -150,6 +150,10 @@ async def create_unavailability_request(
                     return str(r.get("id", "")).strip()
             return ""
 
+        # Look up Slack user ID for suggested replacement
+        slack_id = get_slack_id(body.suggested_replacement or "")
+        print(f"[DEBUG] Suggested replacement: name='{body.suggested_replacement}' -> slack_id='{slack_id}'")
+
         workflow_data = {
             "instructor_email":      user.email,
             "instructor_name":       user.name,
@@ -163,7 +167,7 @@ async def create_unavailability_request(
             "class_type":            class_type,
             "reason":                body.reason,
             "other_comments":        body.other_comments or "",
-            "suggested_replacement": get_slack_id(body.suggested_replacement or ""),
+            "suggested_replacement": slack_id,
             "topics_and_promises":   body.topics_and_promises,
             "batch_pulse_persona":   body.batch_pulse_persona,
             "teaching_pace_style":   body.teaching_pace_style,

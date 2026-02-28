@@ -137,6 +137,13 @@ class SheetsService:
         try:
             worksheet = self.spreadsheet.worksheet(sheet_name)
             records = worksheet.get_all_records()
+            # Sanitize NaN/Infinity values — gspread can return float('nan')
+            # for empty numeric cells, which breaks JSON serialization.
+            import math
+            for row in records:
+                for key, val in row.items():
+                    if isinstance(val, float) and (math.isnan(val) or math.isinf(val)):
+                        row[key] = ""
             return records
         except gspread.WorksheetNotFound:
             logger.error(f"Sheet '{sheet_name}' not found in spreadsheet.")
