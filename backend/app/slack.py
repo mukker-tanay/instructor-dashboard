@@ -22,6 +22,9 @@ async def send_workflow_payload(webhook_url: str, data: dict) -> None:
     # Drop keys with empty / None values — Slack uses the variable's default for missing keys
     clean_data = {k: v for k, v in data.items() if v is not None and v != ""}
 
+    logger.info(f"Slack Workflow payload keys: {list(clean_data.keys())}")
+    logger.debug(f"Slack Workflow payload: {clean_data}")
+
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.post(webhook_url, json=clean_data)
