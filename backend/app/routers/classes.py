@@ -134,7 +134,7 @@ async def get_instructor_options(user: UserInfo = Depends(get_current_user)):
         )
         if parsed >= now:
             name = str(c.get("instructor_name", "")).strip()
-            if name:
+            if name and "scaler instructor" not in name.lower():
                 instructors.add(name)
     return {"instructors": sorted(instructors)}
 

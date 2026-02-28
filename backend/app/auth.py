@@ -154,10 +154,24 @@ async def impersonate(request: Request):
     if not target_email:
         raise HTTPException(status_code=400, detail="Email is required")
 
+    # Look up the real name from class data
+    from app.cache import cache
+    real_name = target_email.split("@")[0]  # fallback
+    try:
+        cache.ensure_initialized()
+        for c in cache.classes:
+            if str(c.get("instructor_email", "")).strip().lower() == target_email.lower():
+                found = str(c.get("instructor_name", "")).strip()
+                if found:
+                    real_name = found
+                    break
+    except Exception:
+        pass
+
     # Build a UserInfo for the target
     target_user = UserInfo(
         email=target_email,
-        name=target_email.split("@")[0],
+        name=real_name,
         picture="",
         role=resolve_role(target_email),
     )
