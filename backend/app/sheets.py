@@ -22,7 +22,7 @@ CLASS_ADDITION_SHEET = "class_addition_requests"
 ID_MAPPING_SHEET = "ID mapping"
 BATCH_METRICS_SHEET = "batch_metrics"
 POLICIES_SHEET = "policies"
-SLACK_MEMBERS_SHEET = "Slack member IDs"
+SLACK_MEMBERS_SHEET = "Slack Member IDs"
 
 # ... (existing code) ...
 
