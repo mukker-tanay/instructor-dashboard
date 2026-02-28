@@ -199,8 +199,8 @@ const BatchAccordionItem: React.FC<BatchAccordionItemProps> = ({
 /* ─── Simple class card for batch view ─── */
 const BatchClassCard: React.FC<{ cls: ClassItem; index: number }> = ({ cls, index }) => {
     const isRI = cls.is_replacement;
-    const classType = cls['Class Type (Regular/Optional)'] || cls['Class Type'] || 'Regular';
-    const instructorName = cls['Instructor Name'] || '';
+    const classType = cls['class_type'] || 'Regular';
+    const instructorName = cls['instructor_name'] || '';
 
     return (
         <div
@@ -210,7 +210,7 @@ const BatchClassCard: React.FC<{ cls: ClassItem; index: number }> = ({ cls, inde
             <div className="card-header">
                 <div>
                     <h3 style={{ fontSize: '0.9375rem', fontWeight: 600, marginBottom: '2px' }}>
-                        {cls['Class Title']}
+                        {cls['class_topic']}
                     </h3>
                     {isRI && (
                         <span className="ri-indicator">
@@ -229,41 +229,21 @@ const BatchClassCard: React.FC<{ cls: ClassItem; index: number }> = ({ cls, inde
             </div>
 
             <div style={{ margin: '8px 0', display: 'flex', alignItems: 'center', gap: '16px', fontSize: '0.875rem', fontWeight: 600, color: 'var(--accent-primary)' }}>
-                <span>{cls['Date of Class (MM/DD/YYYY)']}</span>
-                <span>{cls['Time of Class (HH:MM AM/PM) IST']} IST</span>
+                <span>{cls['class_date']}</span>
+                <span>{cls['time_of_day']} IST</span>
             </div>
 
             <div className="card-meta">
                 <span className="card-meta-item">
-                    <span className="card-meta-label">Batch:</span> {cls['Batch Name']}
+                    <span className="card-meta-label">Batch:</span> {cls['sb_names']}
                 </span>
-                {cls['SBAT Group ID'] && (
+                {cls['sbat_group_id'] && (
                     <span className="card-meta-item">
-                        <span className="card-meta-label">SBAT:</span> {cls['SBAT Group ID']}
+                        <span className="card-meta-label">SBAT:</span> {cls['sbat_group_id']}
                     </span>
                 )}
             </div>
-            {/* Metrics row */}
-            {(cls['Average Rating'] || cls['Total Attendance Percentage'] || cls['PSP']) && (
-                <div className="class-metrics">
-                    {cls['Average Rating'] && (
-                        <span className="metric-pill metric-rating">
-                            Rating: {cls['Average Rating']}
-                            {cls['Number of Ratings'] && <span className="metric-sub">({cls['Number of Ratings']})</span>}
-                        </span>
-                    )}
-                    {cls['Total Attendance Percentage'] && (
-                        <span className="metric-pill metric-attendance">
-                            Attendance: {cls['Total Attendance Percentage']}%
-                        </span>
-                    )}
-                    {cls['PSP'] && (
-                        <span className="metric-pill metric-psp">
-                            PSP: {cls['PSP']}
-                        </span>
-                    )}
-                </div>
-            )}
+
         </div>
     );
 };

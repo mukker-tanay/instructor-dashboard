@@ -59,34 +59,24 @@ const PastClasses: React.FC = () => {
                             <thead>
                                 <tr>
                                     <th>Batch</th>
-                                    <th>Class Title</th>
+                                    <th>Class Topic</th>
                                     <th>Date & Time</th>
-                                    <th>Avg Rating</th>
-                                    <th>Attendance</th>
-                                    <th># Raters</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {classes.map((cls, i) => (
-                                    <tr key={`${cls['SBAT Group ID']}-${cls['Date of Class (MM/DD/YYYY)']}-${i}`}>
+                                    <tr key={`${cls['sbat_group_id']}-${cls['class_date']}-${i}`}>
                                         <td style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
-                                            {cls['Batch Name']}
+                                            {cls['sb_names']}
                                         </td>
-                                        <td>{cls['Class Title']}</td>
+                                        <td>{cls['class_topic']}</td>
                                         <td>
-                                            {cls['Date of Class (MM/DD/YYYY)']}
+                                            {cls['class_date']}
                                             <br />
                                             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                                {cls['Time of Class (HH:MM AM/PM) IST']} IST
+                                                {cls['time_of_day']} IST
                                             </span>
                                         </td>
-                                        <td>
-                                            <span style={{ color: 'var(--warning)', fontWeight: 600 }}>
-                                                {cls['Average Rating'] || '—'}
-                                            </span>
-                                        </td>
-                                        <td>{cls['Total Attendance Percentage'] || '—'}%</td>
-                                        <td>{cls['Number of Ratings'] || '—'}</td>
                                     </tr>
                                 ))}
                             </tbody>

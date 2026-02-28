@@ -29,6 +29,8 @@ async def send_workflow_payload(webhook_url: str, data: dict) -> None:
                 logger.error(
                     f"Slack Workflow webhook returned {resp.status_code}: {resp.text}"
                 )
+            else:
+                logger.info(f"Slack Workflow webhook OK ({resp.status_code})")
     except Exception as e:
         logger.error(f"Slack Workflow webhook failed: {e}")
 

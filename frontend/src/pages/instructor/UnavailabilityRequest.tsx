@@ -49,14 +49,14 @@ const UnavailabilityRequest: React.FC = () => {
     const allClasses = [...upcoming, ...pastRecent];
 
     // Extract unique filter values
-    const modules = [...new Set(allClasses.map(c => c['Module Name']).filter(Boolean))];
-    const batches = [...new Set(allClasses.map(c => c['Batch Name']).filter(Boolean))];
+    const modules = [...new Set(allClasses.map(c => c['module_name']).filter(Boolean))];
+    const batches = [...new Set(allClasses.map(c => c['sb_names']).filter(Boolean))];
 
     // Apply filters
     const filtered = allClasses.filter(c => {
-        if (dateFilter && c['Date of Class (MM/DD/YYYY)'] !== dateFilter) return false;
-        if (moduleFilter && c['Module Name'] !== moduleFilter) return false;
-        if (batchFilter && c['Batch Name'] !== batchFilter) return false;
+        if (dateFilter && c['class_date'] !== dateFilter) return false;
+        if (moduleFilter && c['module_name'] !== moduleFilter) return false;
+        if (batchFilter && c['sb_names'] !== batchFilter) return false;
         return true;
     });
 
@@ -187,16 +187,16 @@ const UnavailabilityRequest: React.FC = () => {
                         <div key={i} className="checkbox-row" onClick={() => toggleSelect(i)}>
                             <input type="checkbox" checked={selected.has(i)} readOnly />
                             <div style={{ flex: 1 }}>
-                                <div style={{ fontWeight: 500 }}>{cls['Class Title']}</div>
+                                <div style={{ fontWeight: 500 }}>{cls['class_topic']}</div>
                                 <div className="card-meta" style={{ marginTop: '4px' }}>
                                     <span className="card-meta-item">
-                                        <span className="card-meta-label">Batch:</span> {cls['Batch Name']}
+                                        <span className="card-meta-label">Batch:</span> {cls['sb_names']}
                                     </span>
                                     <span className="card-meta-item">
-                                        <span className="card-meta-label">Date:</span> {cls['Date of Class (MM/DD/YYYY)']}
+                                        <span className="card-meta-label">Date:</span> {cls['class_date']}
                                     </span>
                                     <span className="card-meta-item">
-                                        <span className="card-meta-label">Time:</span> {cls['Time of Class (HH:MM AM/PM) IST']}
+                                        <span className="card-meta-label">Time:</span> {cls['time_of_day']}
                                     </span>
                                 </div>
                             </div>
@@ -235,7 +235,7 @@ const UnavailabilityRequest: React.FC = () => {
                             <div className="selected-summary-title">Selected Classes ({selectedClasses.length})</div>
                             {selectedClasses.map((cls, i) => (
                                 <span key={i} className="selected-chip">
-                                    {cls['Class Title']} — {cls['Date of Class (MM/DD/YYYY)']}
+                                    {cls['class_topic']} — {cls['class_date']}
                                 </span>
                             ))}
                         </div>

@@ -74,12 +74,12 @@ async def create_unavailability_request(
     results = []
 
     for cls in body.classes:
-        date_str = str(cls.get("date_of_class", cls.get("Date of Class (MM/DD/YYYY)", "")))
-        time_str = str(cls.get("time_of_class", cls.get("Time of Class (HH:MM AM/PM) IST", "")))
+        date_str = str(cls.get("date_of_class", cls.get("class_date", "")))
+        time_str = str(cls.get("time_of_class", cls.get("time_of_day", "")))
 
         # Validations
-        batch = str(cls.get('batch_name', cls.get('Batch Name', '')))
-        title = str(cls.get('class_title', cls.get('Class Title', '')))
+        batch = str(cls.get('batch_name', cls.get('sb_names', '')))
+        title = str(cls.get('class_title', cls.get('class_topic', '')))
         _check_duplicate_unavailability(user.email, batch, title, date_str)
 
         request_id = str(uuid.uuid4())
@@ -100,14 +100,14 @@ async def create_unavailability_request(
         row = [
             user.email,                                                         # Instructor Email
             user.name,                                                          # Instructor Name
-            cls.get("program", cls.get("Program", "")),                         # Program
-            cls.get("batch_name", cls.get("Batch Name", "")),                   # Batch Name
-            cls.get("sbat_group_id", cls.get("SBAT Group ID", "")),             # SBAT Group ID
-            cls.get("module_name", cls.get("Module Name", "")),                 # Module Name
-            cls.get("class_title", cls.get("Class Title", "")),                 # Class Title
+            cls.get("program", ""),                                          # Program
+            cls.get("batch_name", cls.get("sb_names", "")),                    # Batch Name
+            cls.get("sbat_group_id", ""),                                      # SBAT Group ID
+            cls.get("module_name", ""),                                        # Module Name
+            cls.get("class_title", cls.get("class_topic", "")),               # Class Title
             date_str,                                                           # Original Date of Class (MM/DD/YYYY)
             time_str,                                                           # Original Time of Class (HH:MM AM/PM) IST
-            cls.get("class_type", cls.get("Class Type (Regular/Optional)", cls.get("Class Type", ""))),  # Class Type
+            cls.get("class_type", ""),                                         # Class Type
             body.reason,                                                        # Reason for Unavailability
             body.other_comments or "",                                          # Any Other Comments
             body.suggested_replacement or "",                                   # Suggested Instructors for Replacement
@@ -129,15 +129,15 @@ async def create_unavailability_request(
         ]
 
         await asyncio.to_thread(sheets_service.append_row, UNAVAILABILITY_SHEET, row)
-        results.append({"request_id": request_id, "class": cls.get("class_title", cls.get("Class Title", ""))})
+        results.append({"request_id": request_id, "class": cls.get("class_title", cls.get("class_topic", ""))})
 
         # ─── Slack Workflow Notification ───
-        batch_name  = cls.get('batch_name', cls.get('Batch Name', ''))
-        program     = cls.get('program', cls.get('Program', ''))
-        sbat        = cls.get('sbat_group_id', cls.get('SBAT Group ID', ''))
-        module      = cls.get('module_name', cls.get('Module Name', ''))
-        class_title = cls.get('class_title', cls.get('Class Title', ''))
-        class_type  = cls.get('class_type', cls.get('Class Type (Regular/Optional)', cls.get('Class Type', '')))
+        batch_name  = cls.get('batch_name', cls.get('sb_names', ''))
+        program     = cls.get('program', '')
+        sbat        = cls.get('sbat_group_id', '')
+        module      = cls.get('module_name', '')
+        class_title = cls.get('class_title', cls.get('class_topic', ''))
+        class_type  = cls.get('class_type', '')
 
         # Look up raw Slack ID for suggested_replacement (Workflow 'Slack user' variable)
         all_mapping_records = await asyncio.to_thread(sheets_service.get_all_records, "ID mapping")

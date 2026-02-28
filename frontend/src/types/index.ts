@@ -8,20 +8,16 @@ export interface User {
 }
 
 export interface ClassItem {
-    'SBAT Group ID': string;
-    'Instructor Email': string;
-    'Instructor Name': string;
-    'Program': string;
-    'Batch Name': string;
-    'Module Name': string;
-    'Class Title': string;
-    'Date of Class (MM/DD/YYYY)': string;
-    'Time of Class (HH:MM AM/PM) IST': string;
-    'Class Type': string;
-    'Class Type (Regular/Optional)': string;
-    'Total Attendance Percentage': string;
-    'Average Rating': string;
-    'Number of Ratings': string;
+    'sbat_group_id': string;
+    'instructor_email': string;
+    'instructor_name': string;
+    'program': string;
+    'sb_names': string;
+    'module_name': string;
+    'class_topic': string;
+    'class_date': string;
+    'time_of_day': string;
+    'class_type': string;
     [key: string]: string;
 }
 

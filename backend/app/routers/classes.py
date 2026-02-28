@@ -64,14 +64,14 @@ async def get_classes(
     # Filter by instructor email
     user_classes = [
         c for c in cache.classes
-        if str(c.get("Instructor Email", "")).strip().lower() == email
+        if str(c.get("instructor_email", "")).strip().lower() == email
     ]
 
     # Parse date + time for accurate comparison
     for c in user_classes:
         c["_parsed_dt"] = parse_datetime(
-            str(c.get("Date of Class (MM/DD/YYYY)", "")),
-            str(c.get("Time of Class (HH:MM AM/PM) IST", "")),
+            str(c.get("class_date", "")),
+            str(c.get("time_of_day", "")),
         )
 
     if type == "upcoming":
@@ -108,8 +108,8 @@ async def get_batch_options(user: UserInfo = Depends(get_current_user)):
     email = user.email.lower()
     batches = set()
     for c in cache.classes:
-        if str(c.get("Instructor Email", "")).strip().lower() == email:
-            batch = str(c.get("Batch Name", "")).strip()
+        if str(c.get("instructor_email", "")).strip().lower() == email:
+            batch = str(c.get("sb_names", "")).strip()
             if batch:
                 batches.add(batch)
     return {"batches": sorted(batches)}
@@ -126,7 +126,7 @@ async def get_instructor_options(user: UserInfo = Depends(get_current_user)):
 
     instructors = set()
     for c in cache.classes:
-        name = str(c.get("Instructor Name", "")).strip()
+        name = str(c.get("instructor_name", "")).strip()
         if name:
             instructors.add(name)
     return {"instructors": sorted(instructors)}
@@ -149,18 +149,18 @@ async def get_batch_metadata(user: UserInfo = Depends(get_current_user)):
     # 1. First pass: Identify Program for every batch (Global Lookup)
     batch_programs = {}
     for c in cache.classes:
-        batch = str(c.get("Batch Name", "")).strip()
-        program = str(c.get("Program", "")).strip()
+        batch = str(c.get("sb_names", "")).strip()
+        program = str(c.get("program", "")).strip()
         if batch and program:
             batch_programs[batch] = program
 
     # 2. Second pass: Build metadata ONLY for instructor's batches
     for c in cache.classes:
         # Strict Filter: Only process if this instructor taught the class
-        if str(c.get("Instructor Email", "")).strip().lower() != email:
+        if str(c.get("instructor_email", "")).strip().lower() != email:
             continue
 
-        batch = str(c.get("Batch Name", "")).strip()
+        batch = str(c.get("sb_names", "")).strip()
         if not batch:
             continue
 
@@ -172,12 +172,12 @@ async def get_batch_metadata(user: UserInfo = Depends(get_current_user)):
             }
 
         # Parse date to check if upcoming
-        date_str = str(c.get("Date of Class (MM/DD/YYYY)", "")).strip()
-        time_str = str(c.get("Time of Class (HH:MM AM/PM) IST", "")).strip()
+        date_str = str(c.get("class_date", "")).strip()
+        time_str = str(c.get("time_of_day", "")).strip()
         if date_str:
             dt = parse_datetime(date_str, time_str)
             if dt >= now:
-                mod = str(c.get("Module Name", "")).strip()
+                mod = str(c.get("module_name", "")).strip()
                 if mod:
                     meta[batch]["modules"].add(mod)
 
@@ -201,8 +201,8 @@ async def get_my_batches(user: UserInfo = Depends(get_current_user)):
     # Step 1: group ALL classes by (batch, module) → list of classes
     groups: dict = defaultdict(list)
     for c in cache.classes:
-        batch = str(c.get("Batch Name", "")).strip()
-        module = str(c.get("Module Name", "")).strip()
+        batch = str(c.get("sb_names", "")).strip()
+        module = str(c.get("module_name", "")).strip()
         if batch and module:
             groups[(batch, module)].append(c)
 
@@ -213,7 +213,7 @@ async def get_my_batches(user: UserInfo = Depends(get_current_user)):
         # Count how many classes each instructor teaches in this group
         instructor_counts: Counter = Counter()
         for c in classes:
-            instr = str(c.get("Instructor Email", "")).strip().lower()
+            instr = str(c.get("instructor_email", "")).strip().lower()
             instructor_counts[instr] += 1
 
         # Majority instructor = whoever has the most classes
@@ -225,8 +225,8 @@ async def get_my_batches(user: UserInfo = Depends(get_current_user)):
         sorted_classes = sorted(
             classes,
             key=lambda c: parse_datetime(
-                str(c.get("Date of Class (MM/DD/YYYY)", "")),
-                str(c.get("Time of Class (HH:MM AM/PM) IST", "")),
+                str(c.get("class_date", "")),
+                str(c.get("time_of_day", "")),
             ),
         )
 
@@ -235,7 +235,7 @@ async def get_my_batches(user: UserInfo = Depends(get_current_user)):
         for c in sorted_classes:
             entry = {k: v for k, v in c.items() if not k.startswith("_")}
             entry["is_replacement"] = (
-                str(c.get("Instructor Email", "")).strip().lower() != email
+                str(c.get("instructor_email", "")).strip().lower() != email
             )
             cleaned.append(entry)
 
@@ -249,7 +249,7 @@ async def get_my_batches(user: UserInfo = Depends(get_current_user)):
         program = ""
         for mod_classes in modules.values():
             if mod_classes:
-                program = str(mod_classes[0].get("Program", ""))
+                program = str(mod_classes[0].get("program", ""))
                 break
         result[batch] = {
             "program": program,

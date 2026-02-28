@@ -154,7 +154,7 @@ class SheetsService:
         try:
             records = self.get_all_records(BATCH_METRICS_SHEET)
             for row in records:
-                if str(row.get("Batch Name", "")).strip().lower() == batch_name.strip().lower():
+                if str(row.get("sb_names", "")).strip().lower() == batch_name.strip().lower():
                     return row
         except Exception as e:
             logger.warning(f"Could not fetch batch metrics for '{batch_name}': {e}")

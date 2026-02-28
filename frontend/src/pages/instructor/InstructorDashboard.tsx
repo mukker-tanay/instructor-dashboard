@@ -61,9 +61,9 @@ const UnavailabilityModal: React.FC<UnavailModalProps> = ({ cls, isOpen, onClose
     return (
         <Modal isOpen={isOpen} onClose={handleClose} title="Raise Unavailability">
             <div style={{ marginBottom: 'var(--space-md)', padding: '10px 14px', background: 'var(--surface-elevated)', borderRadius: 'var(--radius-sm)', fontSize: '0.8125rem' }}>
-                <div style={{ fontWeight: 600, marginBottom: '4px' }}>{cls['Class Title']}</div>
+                <div style={{ fontWeight: 600, marginBottom: '4px' }}>{cls['class_topic']}</div>
                 <div style={{ color: 'var(--text-muted)' }}>
-                    {cls['Batch Name']} &middot; {cls['Date of Class (MM/DD/YYYY)']} &middot; {cls['Time of Class (HH:MM AM/PM) IST']} IST
+                    {cls['sb_names']} &middot; {cls['class_date']} &middot; {cls['time_of_day']} IST
                 </div>
             </div>
 
@@ -558,11 +558,11 @@ interface ClassCardProps {
 }
 
 const getClassType = (cls: ClassItem) =>
-    cls['Class Type (Regular/Optional)'] || cls['Class Type'] || 'Regular';
+    cls['class_type'] || 'Regular';
 
 /** Check if a class date is more than 3 days in the past */
 const isOlderThan3Days = (cls: ClassItem): boolean => {
-    const dateStr = cls['Date of Class (MM/DD/YYYY)'] || '';
+    const dateStr = cls['class_date'] || '';
     for (const fmt of ['MM/DD/YYYY', 'YYYY-MM-DD']) {
         // Simple parsing for MM/DD/YYYY and YYYY-MM-DD
         const parts = dateStr.trim().split(/[\/\-]/);
@@ -597,10 +597,10 @@ const ClassCard: React.FC<ClassCardProps> = ({ cls, index, isPast, hasExistingRe
             <div className="card-header">
                 <div>
                     <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '4px' }}>
-                        {cls['Class Title']}
+                        {cls['class_topic']}
                     </h3>
                     <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-                        {cls['Module Name']}
+                        {cls['module_name']}
                     </span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -617,39 +617,19 @@ const ClassCard: React.FC<ClassCardProps> = ({ cls, index, isPast, hasExistingRe
 
             {/* Date & Time — prominent */}
             <div style={{ margin: '10px 0', display: 'flex', alignItems: 'center', gap: '16px', fontSize: '0.9375rem', fontWeight: 600, color: 'var(--accent-primary)' }}>
-                <span> {cls['Date of Class (MM/DD/YYYY)']}</span>
-                <span> {cls['Time of Class (HH:MM AM/PM) IST']} IST</span>
+                <span> {cls['class_date']}</span>
+                <span> {cls['time_of_day']} IST</span>
             </div>
 
             <div className="card-meta">
                 <span className="card-meta-item">
-                    <span className="card-meta-label">Module:</span> {cls['Module Name']}
+                    <span className="card-meta-label">Module:</span> {cls['module_name']}
                 </span>
                 <span className="card-meta-item">
-                    <span className="card-meta-label">Batch:</span> {cls['Batch Name']}
+                    <span className="card-meta-label">Batch:</span> {cls['sb_names']}
                 </span>
             </div>
-            {/* Metrics row — past classes only */}
-            {isPast && (cls['Average Rating'] || cls['Total Attendance Percentage'] || cls['PSP']) && (
-                <div className="class-metrics">
-                    {cls['Average Rating'] && (
-                        <span className="metric-pill metric-rating">
-                            Rating: {cls['Average Rating']}
-                            {cls['Number of Ratings'] && <span className="metric-sub">({cls['Number of Ratings']})</span>}
-                        </span>
-                    )}
-                    {cls['Total Attendance Percentage'] && (
-                        <span className="metric-pill metric-attendance">
-                            Attendance: {cls['Total Attendance Percentage']}%
-                        </span>
-                    )}
-                    {cls['PSP'] && (
-                        <span className="metric-pill metric-psp">
-                            PSP: {cls['PSP']}
-                        </span>
-                    )}
-                </div>
-            )}
+
             {!hideUnavail && (
                 <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'flex-end' }}>
                     {hasExistingRequest ? (
@@ -921,19 +901,19 @@ const InstructorDashboard: React.FC = () => {
     /** Apply client-side filters to a class list */
     const applyFilters = (classes: ClassItem[]) => {
         let result = classes;
-        if (filterBatch) result = result.filter(c => String(c['Batch Name'] || '') === filterBatch);
+        if (filterBatch) result = result.filter(c => String(c['sb_names'] || '') === filterBatch);
         if (filterDateRange) {
             const startTs = mmddyyyyToTs(filterDateRange.start);
             const endTs = mmddyyyyToTs(filterDateRange.end);
             result = result.filter(c => {
-                const ts = mmddyyyyToTs(String(c['Date of Class (MM/DD/YYYY)'] || '').trim());
+                const ts = mmddyyyyToTs(String(c['class_date'] || '').trim());
                 return ts >= startTs && ts <= endTs;
             });
         }
-        if (filterModule) result = result.filter(c => String(c['Module Name'] || '') === filterModule);
+        if (filterModule) result = result.filter(c => String(c['module_name'] || '') === filterModule);
         if (filterTime) {
             result = result.filter(c => {
-                const t = String(c['Time of Class (HH:MM AM/PM) IST'] || '').toUpperCase();
+                const t = String(c['time_of_day'] || '').toUpperCase();
                 return filterTime === 'morning' ? t.includes('AM') : t.includes('PM');
             });
         }
@@ -945,9 +925,9 @@ const InstructorDashboard: React.FC = () => {
 
     // Derive unique filter options
     const allClasses = [...upcoming, ...pastRecent];
-    const uniqueBatches = [...new Set(allClasses.map(c => String(c['Batch Name'] || '').trim()).filter(Boolean))].sort();
-    const classDatesSet = new Set(allClasses.map(c => String(c['Date of Class (MM/DD/YYYY)'] || '').trim()).filter(Boolean));
-    const uniqueModules = [...new Set(allClasses.map(c => String(c['Module Name'] || '').trim()).filter(Boolean))].sort();
+    const uniqueBatches = [...new Set(allClasses.map(c => String(c['sb_names'] || '').trim()).filter(Boolean))].sort();
+    const classDatesSet = new Set(allClasses.map(c => String(c['class_date'] || '').trim()).filter(Boolean));
+    const uniqueModules = [...new Set(allClasses.map(c => String(c['module_name'] || '').trim()).filter(Boolean))].sort();
 
     if (loading) {
         return (
@@ -1060,13 +1040,13 @@ const InstructorDashboard: React.FC = () => {
                 <>
                     {filteredUpcoming.map((cls, i) => (
                         <ClassCard
-                            key={`up-${cls['SBAT Group ID']}-${cls['Date of Class (MM/DD/YYYY)']}-${i}`}
+                            key={`up-${cls['sbat_group_id']}-${cls['class_date']}-${i}`}
                             cls={cls}
                             index={i}
                             hasExistingRequest={requestedClassKeys.has(classKey(
-                                String(cls['Batch Name'] || ''),
-                                String(cls['Class Title'] || ''),
-                                String(cls['Date of Class (MM/DD/YYYY)'] || ''),
+                                String(cls['sb_names'] || ''),
+                                String(cls['class_topic'] || ''),
+                                String(cls['class_date'] || ''),
                             ))}
                             onRaiseUnavailability={setUnavailClass}
                         />
@@ -1095,14 +1075,14 @@ const InstructorDashboard: React.FC = () => {
                         <>
                             {filteredPast.map((cls, i) => (
                                 <ClassCard
-                                    key={`past-${cls['SBAT Group ID']}-${cls['Date of Class (MM/DD/YYYY)']}-${i}`}
+                                    key={`past-${cls['sbat_group_id']}-${cls['class_date']}-${i}`}
                                     cls={cls}
                                     index={i}
                                     isPast
                                     hasExistingRequest={requestedClassKeys.has(classKey(
-                                        String(cls['Batch Name'] || ''),
-                                        String(cls['Class Title'] || ''),
-                                        String(cls['Date of Class (MM/DD/YYYY)'] || ''),
+                                        String(cls['sb_names'] || ''),
+                                        String(cls['class_topic'] || ''),
+                                        String(cls['class_date'] || ''),
                                     ))}
                                     onRaiseUnavailability={setUnavailClass}
                                 />
