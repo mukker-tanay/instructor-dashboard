@@ -139,17 +139,15 @@ async def create_unavailability_request(
         class_title = cls.get('class_title', cls.get('class_topic', ''))
         class_type  = cls.get('class_type', '')
 
-        # Look up raw Slack ID for suggested_replacement (Workflow 'Slack user' variable)
-        all_mapping_records = await asyncio.to_thread(sheets_service.get_all_records, "ID mapping")
-
+        # Look up raw Slack ID for suggested_replacement from cached Slack member IDs
         def get_slack_id(name: str) -> str:
             """Return raw Slack member ID for a name, or empty string if not found."""
             if not name:
                 return ""
             clean = name.strip().lower()
-            for r in all_mapping_records:
-                if str(r.get("Name", "")).strip().lower() == clean:
-                    return str(r.get("Member ID", "")).strip()
+            for r in cache.slack_members:
+                if str(r.get("name", "")).strip().lower() == clean:
+                    return str(r.get("id", "")).strip()
             return ""
 
         workflow_data = {

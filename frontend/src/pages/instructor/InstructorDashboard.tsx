@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { getClasses, createUnavailabilityRequest, createClassAdditionRequest, getMyBatches, getMyRequests, getBatchMetadata } from '../../api/client';
+import { getClasses, createUnavailabilityRequest, createClassAdditionRequest, getMyBatches, getMyRequests, getBatchMetadata, getInstructorOptions } from '../../api/client';
 import type { ClassItem } from '../../types';
 import Modal from '../../components/Modal';
 import type { BatchMeta } from '../../api/client';
@@ -23,6 +23,13 @@ const UnavailabilityModal: React.FC<UnavailModalProps> = ({ cls, isOpen, onClose
     const [otherComments, setOtherComments] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
+    const [instructorOptions, setInstructorOptions] = useState<string[]>([]);
+
+    useEffect(() => {
+        if (isOpen) {
+            getInstructorOptions().then(d => setInstructorOptions(d.instructors)).catch(() => { });
+        }
+    }, [isOpen]);
 
     const resetForm = () => {
         setReason(''); setTopics(''); setBatchPulse(''); setTeachingPace('');
@@ -91,7 +98,12 @@ const UnavailabilityModal: React.FC<UnavailModalProps> = ({ cls, isOpen, onClose
             </div>
             <div className="form-group">
                 <label className="form-label">Suggested Instructors for Replacement</label>
-                <input className="form-input" value={suggestedReplacement} onChange={e => setSuggestedReplacement(e.target.value)} placeholder="Optional" />
+                <SearchableDropdown
+                    options={instructorOptions}
+                    value={suggestedReplacement}
+                    onChange={setSuggestedReplacement}
+                    placeholder="Select an instructor (optional)"
+                />
             </div>
             <div className="form-group">
                 <label className="form-label">Other Comments</label>

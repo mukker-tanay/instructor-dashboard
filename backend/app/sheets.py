@@ -22,6 +22,7 @@ CLASS_ADDITION_SHEET = "class_addition_requests"
 ID_MAPPING_SHEET = "ID mapping"
 BATCH_METRICS_SHEET = "batch_metrics"
 POLICIES_SHEET = "policies"
+SLACK_MEMBERS_SHEET = "Slack member IDs"
 
 # ... (existing code) ...
 
@@ -58,7 +59,7 @@ class SheetsService:
             import os
             import json
 
-            # 1. Try JSON string from env var (best for Render/Heroku)
+            # 1. Try JSON string from env var (best for Vercel/Render/Heroku)
             if settings.google_credentials_json:
                 try:
                     logger.info("Initializing Sheets using GOOGLE_CREDENTIALS_JSON...")
@@ -69,9 +70,14 @@ class SheetsService:
                     logger.info("Google Sheets service initialized successfully (JSON).")
                     self._ensure_tracking_columns()
                     return
+                except json.JSONDecodeError as e:
+                    logger.error(f"GOOGLE_CREDENTIALS_JSON is set but contains invalid JSON: {e}")
+                    logger.error(f"First 100 chars of value: {settings.google_credentials_json[:100]!r}")
+                    raise  # Don't fall through — the env var IS set, fix the value
                 except Exception as e:
-                    logger.error(f"Failed to load credentials from JSON: {e}")
-                    # Fall through to file method if JSON fails
+                    import traceback
+                    logger.error(f"GOOGLE_CREDENTIALS_JSON is set but failed to initialize: {e}\n{traceback.format_exc()}")
+                    raise  # Don't fall through — the env var IS set, fix the value
 
             # 2. Try Service Account File
             sa_path = settings.google_service_account_file
@@ -82,9 +88,11 @@ class SheetsService:
             logger.info(f"Using service account file: {sa_path} (exists: {os.path.exists(sa_path)})")
             
             if not os.path.exists(sa_path):
-                 # If neither method works
-                if not settings.google_credentials_json:
-                     raise FileNotFoundError(f"Service account file not found: {sa_path} and GOOGLE_CREDENTIALS_JSON not set.")
+                raise FileNotFoundError(
+                    f"Service account file not found at '{sa_path}'. "
+                    f"Set GOOGLE_CREDENTIALS_JSON env var with the JSON contents, "
+                    f"or ensure '{settings.google_service_account_file}' is deployed alongside the app."
+                )
                 
             creds = Credentials.from_service_account_file(sa_path, scopes=SCOPES)
             self._client = gspread.authorize(creds)

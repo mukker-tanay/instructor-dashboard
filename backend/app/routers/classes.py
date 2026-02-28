@@ -117,18 +117,25 @@ async def get_batch_options(user: UserInfo = Depends(get_current_user)):
 
 @router.get("/instructors")
 async def get_instructor_options(user: UserInfo = Depends(get_current_user)):
-    """Get unique instructor names from all classes (for replacement dropdown)."""
+    """Get unique instructor names from upcoming classes (for replacement dropdown)."""
     # Lazy Init
     try:
         cache.ensure_initialized()
     except Exception:
         pass
 
+    now = datetime.now(IST)
     instructors = set()
     for c in cache.classes:
-        name = str(c.get("instructor_name", "")).strip()
-        if name:
-            instructors.add(name)
+        # Only include instructors from upcoming classes
+        parsed = parse_datetime(
+            str(c.get("class_date", "")),
+            str(c.get("time_of_day", "")),
+        )
+        if parsed >= now:
+            name = str(c.get("instructor_name", "")).strip()
+            if name:
+                instructors.add(name)
     return {"instructors": sorted(instructors)}
 
 

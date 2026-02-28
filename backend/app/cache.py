@@ -18,6 +18,7 @@ class CacheManager:
         self._classes: List[Dict[str, Any]] = []
         self._unavailability_requests: List[Dict[str, Any]] = []
         self._class_addition_requests: List[Dict[str, Any]] = []
+        self._slack_members: List[Dict[str, Any]] = []
         self._last_refresh: float = 0
         self._refresh_task: Optional[asyncio.Task] = None
 
@@ -33,6 +34,10 @@ class CacheManager:
     def class_addition_requests(self) -> List[Dict[str, Any]]:
         return self._class_addition_requests
 
+    @property
+    def slack_members(self) -> List[Dict[str, Any]]:
+        return self._slack_members
+
     def refresh(self) -> None:
         """Pull fresh data from all sheets. Runs in a sync context."""
         try:
@@ -40,11 +45,18 @@ class CacheManager:
             new_classes = sheets_service.get_all_classes()
             new_unavail = sheets_service.get_unavailability_requests()
             new_addition = sheets_service.get_class_addition_requests()
+            new_slack = []
+            try:
+                from app.sheets import SLACK_MEMBERS_SHEET
+                new_slack = sheets_service.get_all_records(SLACK_MEMBERS_SHEET)
+            except Exception as e:
+                logger.warning(f"Could not load Slack members sheet: {e}")
 
             # Atomic swap
             self._classes = new_classes
             self._unavailability_requests = new_unavail
             self._class_addition_requests = new_addition
+            self._slack_members = new_slack
             self._last_refresh = time.time()
 
             logger.info(
