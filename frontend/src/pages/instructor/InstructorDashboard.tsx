@@ -162,6 +162,7 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({ options, value,
                     alignItems: 'center',
                     userSelect: 'none',
                     opacity: disabled ? 0.6 : 1,
+                    overflow: 'hidden',
                 }}
             >
                 <span style={{ color: value ? 'var(--text-primary)' : 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
@@ -421,12 +422,12 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
                                     type="date"
                                     value={form.date_of_class}
                                     onChange={e => update('date_of_class', e.target.value)}
-                                    style={{ backgroundImage: 'none', paddingRight: form.date_of_class ? '90px' : undefined }}
+                                    style={{ backgroundImage: 'none', paddingRight: form.date_of_class ? '90px' : undefined, color: form.date_of_class ? 'transparent' : undefined }}
                                 />
                                 {form.date_of_class && (
                                     <span style={{
-                                        position: 'absolute', right: '36px', top: '50%', transform: 'translateY(-50%)',
-                                        fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 600, pointerEvents: 'none',
+                                        position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)',
+                                        fontSize: '0.875rem', color: 'var(--text-primary)', fontWeight: 500, pointerEvents: 'none',
                                     }}>
                                         {formatDateDisplay(form.date_of_class)}
                                     </span>
