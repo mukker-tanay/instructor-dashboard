@@ -4,30 +4,31 @@ import { getClasses, createUnavailabilityRequest, getInstructorOptions } from '.
 import type { ClassItem } from '../../types';
 import Modal from '../../components/Modal';
 
-/* ─── Helper: check if a class_date string is within last N days ─── */
-function isWithinLastDays(dateStr: string, days: number): boolean {
+/* ─── Helper: check if a class_date is within the last N days (IST) ─── */
+function isRecentPastClass(dateStr: string, daysBack: number): boolean {
     if (!dateStr) return false;
-    // Try common formats: MM/DD/YYYY, YYYY-MM-DD, DD/MM/YYYY
     let d: Date | null = null;
     // Try YYYY-MM-DD
     if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-        d = new Date(dateStr + 'T00:00:00');
+        d = new Date(dateStr + 'T00:00:00+05:30');
     }
     // Try MM/DD/YYYY or DD/MM/YYYY
     else if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateStr)) {
         const parts = dateStr.split('/');
-        // Assume MM/DD/YYYY
+        // Assume MM/DD/YYYY first
         d = new Date(+parts[2], +parts[0] - 1, +parts[1]);
-        // If invalid or future, try DD/MM/YYYY
         if (isNaN(d.getTime())) {
             d = new Date(+parts[2], +parts[1] - 1, +parts[0]);
         }
     }
     if (!d || isNaN(d.getTime())) return false;
-    const now = new Date();
-    const cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate() - days);
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1); // end of today
-    return d >= cutoff && d < today;
+    // Get today in IST
+    const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    const todayStart = new Date(nowIST.getFullYear(), nowIST.getMonth(), nowIST.getDate());
+    const cutoff = new Date(todayStart);
+    cutoff.setDate(cutoff.getDate() - daysBack);
+    // Class date must be >= cutoff and < today (it's a past class)
+    return d >= cutoff && d < todayStart;
 }
 
 /* ─── SearchableDropdown (same as InstructorDashboard) ─── */
@@ -302,7 +303,7 @@ const PastClasses: React.FC = () => {
                             </thead>
                             <tbody>
                                 {classes.map((cls, i) => {
-                                    const recent = isWithinLastDays(cls['class_date'], 2);
+                                    const recent = isRecentPastClass(cls['class_date'], 2);
                                     return (
                                         <tr key={`${cls['sbat_group_id']}-${cls['class_date']}-${i}`}>
                                             <td style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
@@ -316,8 +317,8 @@ const PastClasses: React.FC = () => {
                                                     {cls['time_of_day']} IST
                                                 </span>
                                             </td>
-                                            <td style={{ fontWeight: 500, color: cls['class_rating'] ? 'var(--warning)' : 'var(--text-muted)' }}>
-                                                {cls['class_rating'] ? `⭐ ${cls['class_rating']}` : '—'}
+                                            <td style={{ fontWeight: 500, color: (cls['class_rating'] !== '' && cls['class_rating'] != null) ? 'var(--warning)' : 'var(--text-muted)' }}>
+                                                {(cls['class_rating'] !== '' && cls['class_rating'] != null) ? `⭐ ${cls['class_rating']}` : '—'}
                                             </td>
                                             <td>
                                                 {recent && (
