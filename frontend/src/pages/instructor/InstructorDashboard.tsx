@@ -165,7 +165,15 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({ options, value,
                     overflow: 'hidden',
                 }}
             >
-                <span style={{ color: value ? 'var(--text-primary)' : 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
+                <span style={{
+                    color: value ? 'var(--text-primary)' : 'var(--text-muted)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    flex: '1 1 auto',
+                    minWidth: 0,
+                    display: 'block'
+                }}>
                     {value || placeholder}
                 </span>
             </div>
