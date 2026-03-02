@@ -75,6 +75,9 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({ options, value,
                                     background: value === o ? 'rgba(59,130,246,0.08)' : 'transparent',
                                     color: value === o ? 'var(--primary)' : 'var(--text-primary)',
                                     transition: 'background 0.15s',
+                                    whiteSpace: 'normal',
+                                    wordBreak: 'break-word',
+                                    lineHeight: '1.4'
                                 }}
                                 onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-secondary)')}
                                 onMouseLeave={e => (e.currentTarget.style.background = value === o ? 'rgba(59,130,246,0.12)' : 'transparent')}
