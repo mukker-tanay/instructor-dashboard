@@ -232,17 +232,15 @@ async def create_class_addition_request(
     await asyncio.to_thread(sheets_service.append_row, CLASS_ADDITION_SHEET, row)
 
     # ─── Slack Workflow Notification ───
-    # Look up the approver's raw Slack user ID (Workflow 'Slack user' variable type)
-    all_mapping_records = await asyncio.to_thread(sheets_service.get_all_records, "ID mapping")
-
+    # Look up the approver's raw Slack user ID from cached Slack Member IDs
     def get_slack_id(name: str) -> str:
         """Return raw Slack member ID for a name, or empty string if not found."""
         if not name:
             return ""
         clean = name.strip().lower()
-        for r in all_mapping_records:
-            if str(r.get("Name", "")).strip().lower() == clean:
-                return str(r.get("Member ID", "")).strip()
+        for r in cache.slack_members:
+            if str(r.get("name", "")).strip().lower() == clean:
+                return str(r.get("id", "")).strip()
         return ""
 
     # Only the first approver is used (the Workflow variable expects a single user ID)

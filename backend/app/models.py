@@ -62,7 +62,6 @@ class UnavailabilityRequestCreate(BaseModel):
     suggested_replacement: Optional[str] = ""
     other_comments: Optional[str] = ""
     approvers: List[str] = Field(default_factory=list, description="List of selected approvers")
-    approvers: List[str] = Field(default_factory=list, description="List of selected approvers")
 
 
 class UnavailabilityRequestRow(BaseModel):
@@ -108,16 +107,9 @@ class ClassAdditionRequestCreate(BaseModel):
     module_name: str = Field(..., min_length=1)
     date_of_class: str = Field(..., min_length=1)
     time_of_class: str = Field(..., min_length=1)
-    class_type: str = Field(..., min_length=1)
-    shift_other_classes: str = Field(..., min_length=1)
-    contest_impact: Optional[str] = ""
-    assignment_requirement: str = Field(..., min_length=1)
-    reason: str = Field(..., min_length=1)
-    other_comments: Optional[str] = ""
-    approver: str = Field(..., min_length=1)
     class_type: str = "Regular"
     shift_other_classes: str = "No"
-
+    contest_impact: Optional[str] = ""
     assignment_requirement: str = "None"
     reason: str = Field(..., min_length=1)
     other_comments: Optional[str] = ""
