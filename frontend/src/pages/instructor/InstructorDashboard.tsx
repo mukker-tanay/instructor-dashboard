@@ -152,7 +152,7 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({ options, value,
     };
 
     return (
-        <div ref={ref} style={{ position: 'relative' }}>
+        <div ref={ref} style={{ position: 'relative', width: '100%', minWidth: 0 }}>
             <div
                 className="form-select"
                 onClick={() => { if (!disabled) setOpen(o => !o); }}
@@ -422,16 +422,8 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
                                     type="date"
                                     value={form.date_of_class}
                                     onChange={e => update('date_of_class', e.target.value)}
-                                    style={{ backgroundImage: 'none', paddingRight: form.date_of_class ? '90px' : undefined, color: form.date_of_class ? 'transparent' : undefined }}
+                                    style={{ backgroundImage: 'none', width: '100%' }}
                                 />
-                                {form.date_of_class && (
-                                    <span style={{
-                                        position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)',
-                                        fontSize: '0.875rem', color: 'var(--text-primary)', fontWeight: 500, pointerEvents: 'none',
-                                    }}>
-                                        {formatDateDisplay(form.date_of_class)}
-                                    </span>
-                                )}
                             </div>
                         </div>
                         <div className="form-group">

@@ -84,9 +84,17 @@ async def get_classes(
     # Paginate
     page = filtered[offset : offset + limit]
 
-    # Clean up internal field
+    # For past classes, flag those within last 2 days for the unavailability button
+    cutoff = now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=2)
+
+    # Clean up internal field + add flags
     for c in page:
+        if type == "past":
+            c["_recent_past"] = c["_parsed_dt"] >= cutoff
         c.pop("_parsed_dt", None)
+        # Ensure class_rating is a string for JSON serialization
+        if "class_rating" in c:
+            c["class_rating"] = str(c["class_rating"]) if c["class_rating"] not in (None, "") else ""
 
     return {
         "classes": page,
