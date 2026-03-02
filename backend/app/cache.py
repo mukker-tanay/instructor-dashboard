@@ -39,12 +39,23 @@ class CacheManager:
         return self._slack_members
 
     def refresh(self) -> None:
-        """Pull fresh data from all sheets. Runs in a sync context."""
+        """Pull fresh data from all sheets. Runs in a sync context.
+        Staggers reads to prevent Google Sheets 429 Burst Rate Limits.
+        """
         try:
             logger.info("Refreshing cache from Google Sheets...")
+            import time
+
+            # Fetch each sheet with a tiny delay to avoid bursting the 60/min limit
             new_classes = sheets_service.get_all_classes()
+            time.sleep(0.5)
+
             new_unavail = sheets_service.get_unavailability_requests()
+            time.sleep(0.5)
+
             new_addition = sheets_service.get_class_addition_requests()
+            time.sleep(0.5)
+
             new_slack = []
             try:
                 from app.sheets import SLACK_MEMBERS_SHEET
@@ -65,7 +76,8 @@ class CacheManager:
                 f"{len(self._class_addition_requests)} class addition requests."
             )
         except Exception as e:
-            logger.error(f"Cache refresh failed: {e}")
+            logger.error(f"Cache refresh failed: {e}. Keeping stale data.")
+
 
     async def _periodic_refresh(self) -> None:
         """Background loop that refreshes the cache every N seconds."""

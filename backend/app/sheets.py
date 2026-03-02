@@ -4,6 +4,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 from typing import List, Dict, Any, Optional
 import logging
+import time
 
 from app.config import settings
 
@@ -133,24 +134,42 @@ class SheetsService:
         return self._spreadsheet
 
     def get_all_records(self, sheet_name: str) -> List[Dict[str, Any]]:
-        """Get all records from a sheet as list of dicts."""
-        try:
-            worksheet = self.spreadsheet.worksheet(sheet_name)
-            records = worksheet.get_all_records()
-            # Sanitize NaN/Infinity values — gspread can return float('nan')
-            # for empty numeric cells, which breaks JSON serialization.
-            import math
-            for row in records:
-                for key, val in row.items():
-                    if isinstance(val, float) and (math.isnan(val) or math.isinf(val)):
-                        row[key] = ""
-            return records
-        except gspread.WorksheetNotFound:
-            logger.error(f"Sheet '{sheet_name}' not found in spreadsheet.")
-            return []
-        except Exception as e:
-            logger.error(f"Error reading sheet '{sheet_name}': {e}")
-            return []
+        """Fetch all rows from a given sheet as a list of dicts.
+        Includes exponential backoff for Google Sheets API 429 Rate Limits.
+        """
+        max_retries = 3
+        base_delay = 1.0
+
+        for attempt in range(max_retries):
+            try:
+                # Accessing self.spreadsheet will ensure initialization if needed
+                worksheet = self.spreadsheet.worksheet(sheet_name)
+                records = worksheet.get_all_records()
+                
+                # Sanitize NaN/Infinity values — gspread can return float('nan')
+                # for empty numeric cells, which breaks JSON serialization.
+                import math
+                for row in records:
+                    for key, val in row.items():
+                        if isinstance(val, float) and (math.isnan(val) or math.isinf(val)):
+                            row[key] = ""
+                return records
+
+            except gspread.WorksheetNotFound:
+                logger.error(f"Sheet '{sheet_name}' not found in spreadsheet.")
+                return []
+            except Exception as e:
+                # If it's a 429 quota error, we back off and retry
+                if "429" in str(e) and attempt < max_retries - 1:
+                    sleep_time = base_delay * (2 ** attempt)
+                    logger.warning(f"Rate limit (429) hit for '{sheet_name}'. Retrying in {sleep_time}s (Attempt {attempt + 1}/{max_retries})...")
+                    time.sleep(sleep_time)
+                    continue
+                else:
+                    logger.error(f"Error reading sheet '{sheet_name}': {e}")
+                    return []
+        
+        return []
 
     def get_all_classes(self) -> List[Dict[str, Any]]:
         """Fetch classes from both upcoming and past sheets and combine them."""
