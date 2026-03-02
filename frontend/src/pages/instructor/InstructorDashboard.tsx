@@ -565,34 +565,9 @@ interface ClassCardProps {
 const getClassType = (cls: ClassItem) =>
     cls['class_type'] || 'Regular';
 
-/** Check if a class date is more than 3 days in the past */
-const isOlderThan3Days = (cls: ClassItem): boolean => {
-    const dateStr = cls['class_date'] || '';
-    for (const fmt of ['MM/DD/YYYY', 'YYYY-MM-DD']) {
-        // Simple parsing for MM/DD/YYYY and YYYY-MM-DD
-        const parts = dateStr.trim().split(/[\/\-]/);
-        if (parts.length !== 3) continue;
-        let d: Date | null = null;
-        if (fmt === 'MM/DD/YYYY') {
-            const [m, day, y] = parts;
-            d = new Date(Number(y.length === 2 ? '20' + y : y), Number(m) - 1, Number(day));
-        } else {
-            const [y, m, day] = parts;
-            d = new Date(Number(y), Number(m) - 1, Number(day));
-        }
-        if (d && !isNaN(d.getTime())) {
-            const now = new Date();
-            const diffMs = now.getTime() - d.getTime();
-            const diffDays = diffMs / (1000 * 60 * 60 * 24);
-            return diffDays > 3;
-        }
-    }
-    return false;
-};
-
 const ClassCard: React.FC<ClassCardProps> = ({ cls, index, isPast, hasExistingRequest, onRaiseUnavailability }) => {
     const classType = getClassType(cls);
-    const hideUnavail = isPast && isOlderThan3Days(cls);
+    const hideUnavail = isPast && !cls['_recent_past'];
 
     return (
         <div
@@ -633,6 +608,11 @@ const ClassCard: React.FC<ClassCardProps> = ({ cls, index, isPast, hasExistingRe
                 <span className="card-meta-item">
                     <span className="card-meta-label">Batch:</span> {cls['sb_names']}
                 </span>
+                {isPast && (
+                    <span className="card-meta-item" style={{ color: (cls['class_rating'] !== '' && cls['class_rating'] != null) ? 'var(--warning)' : 'var(--text-muted)', fontWeight: 500 }}>
+                        <span className="card-meta-label" style={{ color: 'var(--text-muted)', fontWeight: 400 }}>Rating:</span> {(cls['class_rating'] !== '' && cls['class_rating'] != null) ? `⭐ ${cls['class_rating']}` : '—'}
+                    </span>
+                )}
             </div>
 
             {!hideUnavail && (
