@@ -649,12 +649,15 @@ const ClassCard: React.FC<ClassCardProps> = ({ cls, index, isPast, hasExistingRe
     );
 };
 
-/* ─── Calendar Picker (range) ─── */
+/* ─── Calendar Picker (single date + range) ─── */
 interface DateRange { start: string; end: string; }  // MM/DD/YYYY
 interface CalendarPickerProps {
     range: DateRange | null;
     classDates: Set<string>;   // MM/DD/YYYY – dates that have at least one class
     onChange: (range: DateRange | null) => void;
+    mode: 'single' | 'range';
+    onModeChange: (mode: 'single' | 'range') => void;
+    onClose?: () => void;
 }
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June',
@@ -669,7 +672,7 @@ const mmddyyyyToTs = (s: string): number => {
     return new Date(y, m - 1, d).getTime();
 };
 
-const CalendarPicker: React.FC<CalendarPickerProps> = ({ range, classDates, onChange }) => {
+const CalendarPicker: React.FC<CalendarPickerProps> = ({ range, classDates, onChange, mode, onModeChange, onClose }) => {
     const today = new Date();
     const [view, setView] = useState({ year: today.getFullYear(), month: today.getMonth() });
     // pending = first click placed, waiting for second
@@ -683,15 +686,20 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({ range, classDates, onCh
     const next = () => setView(v => v.month === 11 ? { year: v.year + 1, month: 0 } : { ...v, month: v.month + 1 });
 
     const handleClick = (dateStr: string) => {
+        if (mode === 'single') {
+            onChange({ start: dateStr, end: dateStr });
+            setPending(null);
+            setHovered(null);
+            onClose?.();
+            return;
+        }
+        // Range mode
         if (!pending) {
-            // first click — start a new range
             setPending(dateStr);
             onChange(null);
         } else if (dateStr === pending) {
-            // clicking the same day cancels
             setPending(null);
         } else {
-            // second click — commit range
             const a = mmddyyyyToTs(pending);
             const b = mmddyyyyToTs(dateStr);
             const [s, e] = a <= b ? [pending, dateStr] : [dateStr, pending];
@@ -732,6 +740,24 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({ range, classDates, onCh
             background: 'var(--bg-card)', border: '1px solid var(--border-light)',
             borderRadius: 'var(--radius-md)', padding: '12px 14px', width: 'fit-content',
         }}>
+            {/* Mode toggle */}
+            <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', padding: '3px', marginBottom: '10px' }}>
+                {(['single', 'range'] as const).map(m => (
+                    <button
+                        key={m}
+                        onClick={() => { onModeChange(m); setPending(null); onChange(null); }}
+                        style={{
+                            padding: '4px 14px', borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer',
+                            fontSize: '0.75rem', fontWeight: 600, fontFamily: 'inherit',
+                            background: mode === m ? 'var(--accent-primary)' : 'transparent',
+                            color: mode === m ? '#fff' : 'var(--text-secondary)',
+                            transition: 'all 0.15s',
+                        }}
+                    >
+                        {m === 'single' ? 'Single Date' : 'Date Range'}
+                    </button>
+                ))}
+            </div>
             {/* Month navigation */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', gap: '12px' }}>
                 <button onClick={prev} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '1rem', padding: '0 4px' }}>‹</button>
@@ -825,18 +851,28 @@ const InstructorDashboard: React.FC = () => {
     const [upcomingLimit, setUpcomingLimit] = useState(10);
     const [pastTotal, setPastTotal] = useState(0);
     const [pastLimit, setPastLimit] = useState(10);
-    const [pastExpanded, setPastExpanded] = useState(true);
+    const [upcomingExpanded, setUpcomingExpanded] = useState(false);
+    const [pastExpanded, setPastExpanded] = useState(false);
     const [loading, setLoading] = useState(true);
 
     // Set of class keys that already have a pending unavailability request
     const [requestedClassKeys, setRequestedClassKeys] = useState<Set<string>>(new Set());
 
-    // Filters
-    const [filterBatch, setFilterBatch] = useState('');
-    const [filterDateRange, setFilterDateRange] = useState<DateRange | null>(null);
-    const [filterModule, setFilterModule] = useState('');
-    const [filterTime, setFilterTime] = useState<'' | 'morning' | 'evening'>();
-    const [showCal, setShowCal] = useState(false);
+    // Upcoming filters
+    const [upFilterBatch, setUpFilterBatch] = useState('');
+    const [upFilterDateRange, setUpFilterDateRange] = useState<DateRange | null>(null);
+    const [upFilterModule, setUpFilterModule] = useState('');
+    const [upFilterTime, setUpFilterTime] = useState<'' | 'morning' | 'evening'>('');
+    const [upShowCal, setUpShowCal] = useState(false);
+    const [upCalMode, setUpCalMode] = useState<'single' | 'range'>('single');
+
+    // Past filters
+    const [pastFilterBatch, setPastFilterBatch] = useState('');
+    const [pastFilterDateRange, setPastFilterDateRange] = useState<DateRange | null>(null);
+    const [pastFilterModule, setPastFilterModule] = useState('');
+    const [pastFilterTime, setPastFilterTime] = useState<'' | 'morning' | 'evening'>('');
+    const [pastShowCal, setPastShowCal] = useState(false);
+    const [pastCalMode, setPastCalMode] = useState<'single' | 'range'>('single');
 
     // Unavailability modal state
     const [unavailClass, setUnavailClass] = useState<ClassItem | null>(null);
@@ -895,35 +931,40 @@ const InstructorDashboard: React.FC = () => {
     };
 
     /** Apply client-side filters to a class list */
-    const applyFilters = (classes: ClassItem[]) => {
+    const applyFilters = (
+        classes: ClassItem[],
+        batch: string, module: string, time: '' | 'morning' | 'evening', dateRange: DateRange | null
+    ) => {
         let result = classes;
-        if (filterBatch) result = result.filter(c => String(c['sb_names'] || '') === filterBatch);
-        if (filterDateRange) {
-            const startTs = mmddyyyyToTs(filterDateRange.start);
-            const endTs = mmddyyyyToTs(filterDateRange.end);
+        if (batch) result = result.filter(c => String(c['sb_names'] || '') === batch);
+        if (dateRange) {
+            const startTs = mmddyyyyToTs(dateRange.start);
+            const endTs = mmddyyyyToTs(dateRange.end);
             result = result.filter(c => {
                 const ts = mmddyyyyToTs(String(c['class_date'] || '').trim());
                 return ts >= startTs && ts <= endTs;
             });
         }
-        if (filterModule) result = result.filter(c => String(c['module_name'] || '') === filterModule);
-        if (filterTime) {
+        if (module) result = result.filter(c => String(c['module_name'] || '') === module);
+        if (time) {
             result = result.filter(c => {
                 const t = String(c['time_of_day'] || '').toUpperCase();
-                return filterTime === 'morning' ? t.includes('AM') : t.includes('PM');
+                return time === 'morning' ? t.includes('AM') : t.includes('PM');
             });
         }
         return result;
     };
 
-    const filteredUpcoming = applyFilters(upcoming);
-    const filteredPast = applyFilters(pastRecent);
+    const filteredUpcoming = applyFilters(upcoming, upFilterBatch, upFilterModule, upFilterTime, upFilterDateRange);
+    const filteredPast = applyFilters(pastRecent, pastFilterBatch, pastFilterModule, pastFilterTime, pastFilterDateRange);
 
-    // Derive unique filter options
-    const allClasses = [...upcoming, ...pastRecent];
-    const uniqueBatches = [...new Set(allClasses.map(c => String(c['sb_names'] || '').trim()).filter(Boolean))].sort();
-    const classDatesSet = new Set(allClasses.map(c => String(c['class_date'] || '').trim()).filter(Boolean));
-    const uniqueModules = [...new Set(allClasses.map(c => String(c['module_name'] || '').trim()).filter(Boolean))].sort();
+    // Derive unique filter options per section
+    const upBatches = [...new Set(upcoming.map(c => String(c['sb_names'] || '').trim()).filter(Boolean))].sort();
+    const upModules = [...new Set(upcoming.map(c => String(c['module_name'] || '').trim()).filter(Boolean))].sort();
+    const upDatesSet = new Set(upcoming.map(c => String(c['class_date'] || '').trim()).filter(Boolean));
+    const pastBatches = [...new Set(pastRecent.map(c => String(c['sb_names'] || '').trim()).filter(Boolean))].sort();
+    const pastModules = [...new Set(pastRecent.map(c => String(c['module_name'] || '').trim()).filter(Boolean))].sort();
+    const pastDatesSet = new Set(pastRecent.map(c => String(c['class_date'] || '').trim()).filter(Boolean));
 
     if (loading) {
         return (
@@ -964,100 +1005,83 @@ const InstructorDashboard: React.FC = () => {
                 </button>
             </div>
 
-            {/* Filters */}
-            <div className="filters-bar" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 'var(--space-sm)' }}>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-sm)', alignItems: 'center' }}>
-                    {/* Batch */}
-                    <select className="filter-select" value={filterBatch} onChange={e => setFilterBatch(e.target.value)}>
-                        <option value="">All Batches</option>
-                        {uniqueBatches.map(b => <option key={b} value={b}>{b.length > 50 ? b.slice(0, 50) + '…' : b}</option>)}
-                    </select>
-                    {/* Module */}
-                    <select className="filter-select" value={filterModule} onChange={e => setFilterModule(e.target.value)}>
-                        <option value="">All Modules</option>
-                        {uniqueModules.map(m => <option key={m} value={m}>{m.length > 50 ? m.slice(0, 50) + '…' : m}</option>)}
-                    </select>
-                    {/* Morning / Evening toggle */}
-                    <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-input)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', padding: '3px' }}>
-                        {(['morning', 'evening'] as const).map(slot => (
-                            <button
-                                key={slot}
-                                onClick={() => setFilterTime(prev => prev === slot ? '' : slot)}
-                                style={{
-                                    padding: '4px 12px', borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer',
-                                    fontSize: '0.8125rem', fontWeight: 500, fontFamily: 'inherit',
-                                    background: filterTime === slot ? 'var(--accent-primary)' : 'transparent',
-                                    color: filterTime === slot ? '#fff' : 'var(--text-secondary)',
-                                    transition: 'all 0.15s',
-                                }}
-                            >
-                                {slot === 'morning' ? 'Morning' : 'Evening'}
-                            </button>
-                        ))}
-                    </div>
-                    {/* Date toggle pill */}
-                    <button
-                        onClick={() => setShowCal(p => !p)}
-                        style={{
-                            padding: '5px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-light)',
-                            background: filterDateRange ? 'rgba(99,102,241,0.12)' : 'var(--bg-input)',
-                            color: filterDateRange ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                            fontWeight: filterDateRange ? 600 : 400, cursor: 'pointer', fontSize: '0.8125rem',
-                            fontFamily: 'inherit', transition: 'all 0.15s',
-                        }}
-                    >
-                        {filterDateRange ? `${filterDateRange.start} – ${filterDateRange.end}` : 'Date range'}
-                    </button>
-                    {/* Clear all */}
-                    {(filterBatch || filterDateRange || filterModule || filterTime) && (
-                        <button className="btn btn-sm btn-ghost" onClick={() => { setFilterBatch(''); setFilterDateRange(null); setFilterModule(''); setFilterTime(''); }}>Clear all</button>
-                    )}
-                </div>
-                {/* Inline calendar */}
-                {showCal && (
-                    <CalendarPicker
-                        range={filterDateRange}
-                        classDates={classDatesSet}
-                        onChange={setFilterDateRange}
-                    />
-                )}
-            </div>
-
-            {/* Upcoming Classes */}
-            <h2 style={{ fontSize: '0.9375rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 'var(--space-md)', marginTop: 'var(--space-sm)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Upcoming
+            {/* ─── Upcoming Classes ─── */}
+            <h2
+                onClick={() => setUpcomingExpanded(prev => !prev)}
+                style={{ fontSize: '0.9375rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: upcomingExpanded ? 'var(--space-md)' : 0, marginTop: 'var(--space-sm)', textTransform: 'uppercase', letterSpacing: '0.05em', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', userSelect: 'none' }}
+            >
+                <span style={{ display: 'inline-block', transition: 'transform 0.2s', transform: upcomingExpanded ? 'rotate(90deg)' : 'rotate(0deg)', fontSize: '0.75rem' }}>&#9654;</span>
+                Upcoming ({upcomingTotal})
             </h2>
-            {filteredUpcoming.length === 0 ? (
-                <div className="empty-state" style={{ marginBottom: 'var(--space-xl)' }}>
-                    <div className="empty-state-icon">&mdash;</div>
-                    <p className="empty-state-text">{upcoming.length === 0 ? 'No upcoming classes found.' : 'No classes match current filters.'}</p>
-                </div>
-            ) : (
+            {upcomingExpanded && (
                 <>
-                    {filteredUpcoming.map((cls, i) => (
-                        <ClassCard
-                            key={`up-${cls['sbat_group_id']}-${cls['class_date']}-${i}`}
-                            cls={cls}
-                            index={i}
-                            hasExistingRequest={requestedClassKeys.has(classKey(
-                                String(cls['sb_names'] || ''),
-                                String(cls['class_topic'] || ''),
-                                String(cls['class_date'] || ''),
+                    {/* Upcoming filters */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-sm)', alignItems: 'center', marginBottom: 'var(--space-md)' }}>
+                        <select className="filter-select" value={upFilterBatch} onChange={e => setUpFilterBatch(e.target.value)}>
+                            <option value="">All Batches</option>
+                            {upBatches.map((b: string) => <option key={b} value={b}>{b.length > 50 ? b.slice(0, 50) + '…' : b}</option>)}
+                        </select>
+                        <select className="filter-select" value={upFilterModule} onChange={e => setUpFilterModule(e.target.value)}>
+                            <option value="">All Modules</option>
+                            {upModules.map((m: string) => <option key={m} value={m}>{m.length > 50 ? m.slice(0, 50) + '…' : m}</option>)}
+                        </select>
+                        <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-input)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', padding: '3px' }}>
+                            {(['morning', 'evening'] as const).map(slot => (
+                                <button key={slot} onClick={() => setUpFilterTime(prev => prev === slot ? '' : slot)}
+                                    style={{ padding: '4px 12px', borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 500, fontFamily: 'inherit', background: upFilterTime === slot ? 'var(--accent-primary)' : 'transparent', color: upFilterTime === slot ? '#fff' : 'var(--text-secondary)', transition: 'all 0.15s' }}>
+                                    {slot === 'morning' ? 'Morning' : 'Evening'}
+                                </button>
                             ))}
-                            onRaiseUnavailability={setUnavailClass}
-                        />
-                    ))}
-                    {upcoming.length < upcomingTotal && (
-                        <div style={{ textAlign: 'center', marginTop: 'var(--space-lg)' }}>
-                            <button className="btn btn-secondary" onClick={loadMore}>
-                                Load More ({upcomingTotal - upcoming.length} remaining)
-                            </button>
                         </div>
+                        <div style={{ position: 'relative' }}>
+                            <button onClick={() => setUpShowCal(p => !p)}
+                                style={{ padding: '5px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-light)', background: upFilterDateRange ? 'rgba(99,102,241,0.12)' : 'var(--bg-input)', color: upFilterDateRange ? 'var(--accent-primary)' : 'var(--text-secondary)', fontWeight: upFilterDateRange ? 600 : 400, cursor: 'pointer', fontSize: '0.8125rem', fontFamily: 'inherit', transition: 'all 0.15s' }}>
+                                {upFilterDateRange ? (upFilterDateRange.start === upFilterDateRange.end ? upFilterDateRange.start : `${upFilterDateRange.start} – ${upFilterDateRange.end}`) : '📅 Date'}
+                            </button>
+                            {upShowCal && (
+                                <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 100, boxShadow: 'var(--shadow-lg)', borderRadius: 'var(--radius-md)' }}>
+                                    <CalendarPicker range={upFilterDateRange} classDates={upDatesSet} onChange={setUpFilterDateRange} mode={upCalMode} onModeChange={setUpCalMode} onClose={() => setUpShowCal(false)} />
+                                </div>
+                            )}
+                        </div>
+                        {(upFilterBatch || upFilterDateRange || upFilterModule || upFilterTime) && (
+                            <button className="btn btn-sm btn-ghost" onClick={() => { setUpFilterBatch(''); setUpFilterDateRange(null); setUpFilterModule(''); setUpFilterTime(''); }}>Clear</button>
+                        )}
+                    </div>
+
+                    {filteredUpcoming.length === 0 ? (
+                        <div className="empty-state" style={{ marginBottom: 'var(--space-xl)' }}>
+                            <div className="empty-state-icon">&mdash;</div>
+                            <p className="empty-state-text">{upcoming.length === 0 ? 'No upcoming classes found.' : 'No classes match current filters.'}</p>
+                        </div>
+                    ) : (
+                        <>
+                            {filteredUpcoming.map((cls, i) => (
+                                <ClassCard
+                                    key={`up-${cls['sbat_group_id']}-${cls['class_date']}-${i}`}
+                                    cls={cls}
+                                    index={i}
+                                    hasExistingRequest={requestedClassKeys.has(classKey(
+                                        String(cls['sb_names'] || ''),
+                                        String(cls['class_topic'] || ''),
+                                        String(cls['class_date'] || ''),
+                                    ))}
+                                    onRaiseUnavailability={setUnavailClass}
+                                />
+                            ))}
+                            {upcoming.length < upcomingTotal && (
+                                <div style={{ textAlign: 'center', marginTop: 'var(--space-lg)' }}>
+                                    <button className="btn btn-secondary" onClick={loadMore}>
+                                        Load More ({upcomingTotal - upcoming.length} remaining)
+                                    </button>
+                                </div>
+                            )}
+                        </>
                     )}
                 </>
             )}
 
-            {/* Past Classes */}
+            {/* ─── Past Classes ─── */}
             {pastRecent.length > 0 && (
                 <>
                     <h2
@@ -1069,6 +1093,40 @@ const InstructorDashboard: React.FC = () => {
                     </h2>
                     {pastExpanded && (
                         <>
+                            {/* Past filters */}
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-sm)', alignItems: 'center', marginBottom: 'var(--space-md)' }}>
+                                <select className="filter-select" value={pastFilterBatch} onChange={e => setPastFilterBatch(e.target.value)}>
+                                    <option value="">All Batches</option>
+                                    {pastBatches.map((b: string) => <option key={b} value={b}>{b.length > 50 ? b.slice(0, 50) + '…' : b}</option>)}
+                                </select>
+                                <select className="filter-select" value={pastFilterModule} onChange={e => setPastFilterModule(e.target.value)}>
+                                    <option value="">All Modules</option>
+                                    {pastModules.map((m: string) => <option key={m} value={m}>{m.length > 50 ? m.slice(0, 50) + '…' : m}</option>)}
+                                </select>
+                                <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-input)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', padding: '3px' }}>
+                                    {(['morning', 'evening'] as const).map(slot => (
+                                        <button key={slot} onClick={() => setPastFilterTime(prev => prev === slot ? '' : slot)}
+                                            style={{ padding: '4px 12px', borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 500, fontFamily: 'inherit', background: pastFilterTime === slot ? 'var(--accent-primary)' : 'transparent', color: pastFilterTime === slot ? '#fff' : 'var(--text-secondary)', transition: 'all 0.15s' }}>
+                                            {slot === 'morning' ? 'Morning' : 'Evening'}
+                                        </button>
+                                    ))}
+                                </div>
+                                <div style={{ position: 'relative' }}>
+                                    <button onClick={() => setPastShowCal(p => !p)}
+                                        style={{ padding: '5px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-light)', background: pastFilterDateRange ? 'rgba(99,102,241,0.12)' : 'var(--bg-input)', color: pastFilterDateRange ? 'var(--accent-primary)' : 'var(--text-secondary)', fontWeight: pastFilterDateRange ? 600 : 400, cursor: 'pointer', fontSize: '0.8125rem', fontFamily: 'inherit', transition: 'all 0.15s' }}>
+                                        {pastFilterDateRange ? (pastFilterDateRange.start === pastFilterDateRange.end ? pastFilterDateRange.start : `${pastFilterDateRange.start} – ${pastFilterDateRange.end}`) : '📅 Date'}
+                                    </button>
+                                    {pastShowCal && (
+                                        <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 100, boxShadow: 'var(--shadow-lg)', borderRadius: 'var(--radius-md)' }}>
+                                            <CalendarPicker range={pastFilterDateRange} classDates={pastDatesSet} onChange={setPastFilterDateRange} mode={pastCalMode} onModeChange={setPastCalMode} onClose={() => setPastShowCal(false)} />
+                                        </div>
+                                    )}
+                                </div>
+                                {(pastFilterBatch || pastFilterDateRange || pastFilterModule || pastFilterTime) && (
+                                    <button className="btn btn-sm btn-ghost" onClick={() => { setPastFilterBatch(''); setPastFilterDateRange(null); setPastFilterModule(''); setPastFilterTime(''); }}>Clear</button>
+                                )}
+                            </div>
+
                             {filteredPast.map((cls, i) => (
                                 <ClassCard
                                     key={`past-${cls['sbat_group_id']}-${cls['class_date']}-${i}`}
