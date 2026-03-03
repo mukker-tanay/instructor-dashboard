@@ -215,7 +215,7 @@ async def create_class_addition_request(
         body.assignment_requirement,    # Requirement of Assignment & Homework
         body.reason,                    # Reason for Addition of Class
         body.other_comments or "",      # Other Comments
-        ", ".join(body.approvers),      # Select Approver (Joined list)
+        body.approver,                  # Select Approver
         user.email,                     # Submitted by
         now,                            # Time stamp
         "",                             # Slack Thread Link
@@ -244,7 +244,7 @@ async def create_class_addition_request(
         return ""
 
     # Only the first approver is used (the Workflow variable expects a single user ID)
-    approver_id = get_slack_id(body.approvers[0]) if body.approvers else ""
+    approver_id = get_slack_id(body.approver) if body.approver else ""
 
     workflow_data = {
         "instructor_email":       user.email,

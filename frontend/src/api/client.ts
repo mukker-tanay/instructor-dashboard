@@ -63,12 +63,6 @@ export const getAdminRequests = (status = 'all', requestType = 'all') =>
 export const updateRequestStatus = (requestId: string, data: StatusUpdate) =>
     api.patch(`/admin/requests/${requestId}/status`, data).then(r => r.data);
 
-export const lockRequest = (requestId: string) =>
-    api.post(`/admin/requests/${requestId}/lock`).then(r => r.data);
-
-export const unlockRequest = (requestId: string) =>
-    api.delete(`/admin/requests/${requestId}/lock`).then(r => r.data);
-
 /* ── Health ── */
 export const healthCheck = () => api.get('/health').then(r => r.data);
 

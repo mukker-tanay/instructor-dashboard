@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getAdminRequests, lockRequest, updateRequestStatus, getInstructorOptions } from '../../api/client';
+import { getAdminRequests, updateRequestStatus, getInstructorOptions } from '../../api/client';
 import type { RequestItem, StatusUpdate } from '../../types';
 import Modal from '../../components/Modal';
 
@@ -15,7 +15,6 @@ const AdminDashboard: React.FC = () => {
     const [statusVal, setStatusVal] = useState<'Approved' | 'Rejected'>('Approved');
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
-    const [lockError, setLockError] = useState('');
 
     // Unavailability-specific fields
     const [finalStatus, setFinalStatus] = useState('');
@@ -27,6 +26,7 @@ const AdminDashboard: React.FC = () => {
     const [paymentStatus, setPaymentStatus] = useState('Sanctioned');
     const [redFlag, setRedFlag] = useState('No');
     const [redFlagReason, setRedFlagReason] = useState('');
+    const [rejectionReason, setRejectionReason] = useState('');
 
     const fetchRequests = useCallback(async () => {
         setLoading(true);
@@ -47,27 +47,22 @@ const AdminDashboard: React.FC = () => {
     const openApproval = async (r: RequestItem) => {
         setSelectedRequest(r);
         setError('');
-        setLockError('');
 
         // Pre-fill fields if already approved
         const currentStatus = String(r.status || r.Status || 'Pending').trim();
         setStatusVal(currentStatus === 'Approved' ? 'Approved' : 'Approved'); // Default to Approved if opening edit, or if pending
 
         if (currentStatus === 'Approved' && r.request_type === 'class_addition') {
-            // Try to map existing values if available in the request object (depends on API return)
-            // For now, we might default or need to trust the admin to re-select. 
-            // Ideally we should parse the existing "Sanctioned/Non-Sanctioned" value if it's returned.
-            // Let's see if we can map it.
             const payment = String(r['Class Added on Class Day/Non-Class Day Sanctioned/Non-Sanctioned'] || r['Sanctioned/Non-Sanctioned'] || 'Sanctioned');
             setPaymentStatus(payment);
 
             const rf = String(r['Red Flag'] || 'No');
             setRedFlag(rf);
         } else {
-            // Reset class addition fields
             setPaymentStatus('Sanctioned');
             setRedFlag('No');
             setRedFlagReason('');
+            setRejectionReason('');
         }
 
         // Reset unavailability fields
@@ -80,16 +75,6 @@ const AdminDashboard: React.FC = () => {
             getInstructorOptions().then(d => setInstructorOptions(d.instructors)).catch(() => { });
         }
 
-        const rid = String(r.request_id || r['Request ID'] || '');
-        if (rid) {
-            try {
-                await lockRequest(rid);
-            } catch (err: any) {
-                if (err.response?.status === 409) {
-                    setLockError(err.response.data.detail);
-                }
-            }
-        }
         setShowModal(true);
     };
 
@@ -125,6 +110,10 @@ const AdminDashboard: React.FC = () => {
                     payload.red_flag = redFlag as any;
                     payload.red_flag_reason = redFlag === 'Yes' ? redFlagReason : undefined;
                 }
+            }
+
+            if (statusVal === 'Rejected' && rejectionReason) {
+                payload.rejection_reason = rejectionReason;
             }
 
             await updateRequestStatus(rid, payload);
@@ -187,7 +176,6 @@ const AdminDashboard: React.FC = () => {
                     const reason = isUnavail
                         ? String(r['Reason for Unavailability'] || '')
                         : String(r['Reason for Addition of Class'] || '');
-                    const isLocked = !!(r.locked_by);
 
                     return (
                         <div key={i} className="card class-card" style={{ animationDelay: `${i * 30}ms` }}>
@@ -228,11 +216,6 @@ const AdminDashboard: React.FC = () => {
                                     </span>
                                 )}
                             </div>
-                            {isLocked && (
-                                <div className="lock-info" style={{ marginTop: '8px' }}>
-                                    Currently handled by {String(r.locked_by)}
-                                </div>
-                            )}
                             {(status === 'Pending' || (status === 'Approved' && !isUnavail)) && (
                                 <div style={{ marginTop: '12px' }}>
                                     <button className="btn btn-primary btn-sm" onClick={() => openApproval(r)}>
@@ -251,12 +234,6 @@ const AdminDashboard: React.FC = () => {
                 onClose={() => setShowModal(false)}
                 title="Update Request Status"
             >
-                {lockError && (
-                    <div className="lock-info" style={{ marginBottom: '16px' }}>
-                        {lockError}
-                    </div>
-                )}
-
                 {selectedRequest && (
                     <>
                         <div style={{ marginBottom: '16px', padding: '12px', background: 'var(--surface-elevated)', borderRadius: 'var(--radius-md)', fontSize: '0.8125rem' }}>
@@ -275,6 +252,20 @@ const AdminDashboard: React.FC = () => {
                                 <button className={`tab ${statusVal === 'Rejected' ? 'active' : ''}`} onClick={() => setStatusVal('Rejected')} style={statusVal === 'Rejected' ? { background: 'var(--danger)', color: 'white' } : {}}>Reject</button>
                             </div>
                         </div>
+
+                        {/* Rejection reason (shown when Rejected is selected) */}
+                        {statusVal === 'Rejected' && (
+                            <div className="form-group">
+                                <label className="form-label">Reason for Rejection</label>
+                                <textarea
+                                    className="form-textarea"
+                                    value={rejectionReason}
+                                    onChange={e => setRejectionReason(e.target.value)}
+                                    placeholder="Enter reason for rejecting this request..."
+                                    rows={3}
+                                />
+                            </div>
+                        )}
 
                         {/* ── Unavailability-specific fields (on Approve) ── */}
                         {statusVal === 'Approved' && selectedRequest.request_type === 'unavailability' && (
@@ -364,7 +355,7 @@ const AdminDashboard: React.FC = () => {
                             <button
                                 className={`btn ${statusVal === 'Approved' ? 'btn-success' : 'btn-danger'}`}
                                 onClick={handleSubmitStatus}
-                                disabled={submitting || !!lockError}
+                                disabled={submitting}
                             >
                                 {submitting ? 'Saving...' : `${statusVal === 'Approved' ? 'Approve' : 'Reject'}`}
                             </button>

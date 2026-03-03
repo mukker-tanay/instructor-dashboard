@@ -113,7 +113,7 @@ class ClassAdditionRequestCreate(BaseModel):
     assignment_requirement: str = "None"
     reason: str = Field(..., min_length=1)
     other_comments: Optional[str] = ""
-    approvers: List[str] = Field(default_factory=list, description="List of selected approvers")
+    approver: str = Field("", description="Selected approver name")
 
 
 class ClassAdditionRequestRow(BaseModel):
@@ -156,10 +156,9 @@ class StatusUpdateRequest(BaseModel):
     red_flag_reason: Optional[str] = None
     replacement_instructor: Optional[str] = None
     final_status: Optional[str] = None
+    rejection_reason: Optional[str] = None
 
 
-class LockRequest(BaseModel):
-    pass  # Admin email comes from auth
 
 
 # ── Auth Models ────────────────────────────────────────────────────────────

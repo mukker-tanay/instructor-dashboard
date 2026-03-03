@@ -265,13 +265,13 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
         shift_other_classes: 'No',
         assignment_requirement: 'None', reason: '', other_comments: '',
     });
-    const [approvers, setApprovers] = useState<string[]>([]);
     const [step, setStep] = useState<'form' | 'confirm'>('form');
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
     const [batchOptions, setBatchOptions] = useState<string[]>([]);
     const [batchMeta, setBatchMeta] = useState<Record<string, BatchMeta>>({});
     const [customBatchName, setCustomBatchName] = useState('');
+    const [approver, setApprover] = useState('');
 
     // Fetch instructor's own batches + metadata on open
     React.useEffect(() => {
@@ -337,8 +337,8 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
                 return false;
             }
         }
-        if (approvers.length === 0) {
-            setError('Please select at least one approver.');
+        if (!approver) {
+            setError('Please select an approver.');
             return false;
         }
         return true;
@@ -353,7 +353,7 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
             const submitForm = isOthersBatch
                 ? { ...form, batch_name: customBatchName.trim() }
                 : form;
-            await createClassAdditionRequest({ ...submitForm, approvers });
+            await createClassAdditionRequest({ ...submitForm, approver });
             resetForm();
             onSuccess();
             onClose();
@@ -371,8 +371,8 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
             shift_other_classes: 'No',
             assignment_requirement: 'None', reason: '', other_comments: '',
         });
-        setApprovers([]);
         setCustomBatchName('');
+        setApprover('');
         setStep('form');
         setError('');
     };
@@ -525,36 +525,15 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
                         <textarea className="form-textarea" value={form.other_comments} onChange={e => update('other_comments', e.target.value)} placeholder="Optional" />
                     </div>
 
-                    {/* Approvers */}
+                    {/* Approver */}
                     <div className="form-group">
-                        <label className="form-label form-label-required">Select Approvers</label>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
-                            {APPROVER_OPTIONS.map(name => {
-                                const isSelected = approvers.includes(name);
-                                return (
-                                    <div
-                                        key={name}
-                                        onClick={() => {
-                                            if (isSelected) setApprovers(prev => prev.filter(n => n !== name));
-                                            else setApprovers(prev => [...prev, name]);
-                                        }}
-                                        style={{
-                                            padding: '6px 12px',
-                                            borderRadius: '20px',
-                                            fontSize: '0.8125rem',
-                                            cursor: 'pointer',
-                                            border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border)',
-                                            background: isSelected ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-secondary)',
-                                            color: isSelected ? 'var(--primary)' : 'var(--text-primary)',
-                                            transition: 'all 0.2s',
-                                            fontWeight: isSelected ? 500 : 400,
-                                        }}
-                                    >
-                                        {name}
-                                    </div>
-                                );
-                            })}
-                        </div>
+                        <label className="form-label form-label-required">Select Approver</label>
+                        <select className="form-select" style={{ appearance: 'none' }} value={approver} onChange={e => setApprover(e.target.value)}>
+                            <option value="">Select approver...</option>
+                            {APPROVER_OPTIONS.map(name => (
+                                <option key={name} value={name}>{name}</option>
+                            ))}
+                        </select>
                     </div>
 
                     <div className="modal-actions">
@@ -578,10 +557,12 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
                                 </span>
                             </div>
                         ))}
-                        <div>
-                            <span style={{ color: 'var(--text-muted)' }}>Approvers: </span>
-                            <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{approvers.join(', ')}</span>
-                        </div>
+                        {approver && (
+                            <div>
+                                <span style={{ color: 'var(--text-muted)' }}>Approver: </span>
+                                <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{approver}</span>
+                            </div>
+                        )}
                     </div>
                     {error && (
                         <div style={{ marginTop: '12px', padding: '8px 12px', background: 'var(--danger-bg)', borderRadius: 'var(--radius-sm)', color: 'var(--danger)', fontSize: '0.8125rem' }}>

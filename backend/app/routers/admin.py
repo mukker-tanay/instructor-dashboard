@@ -1,7 +1,7 @@
-"""Admin endpoints — view requests, approve/reject, locking."""
+"""Admin endpoints — view requests, approve/reject."""
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
@@ -17,7 +17,7 @@ from app.slack import fire_slack_notification
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
-LOCK_EXPIRY_MINUTES = 10
+
 
 
 def _find_request(request_id: str):
@@ -113,21 +113,6 @@ async def update_request_status(
          # For now, let's keep it strict for unavailability unless needed.
          raise HTTPException(status_code=400, detail="Unavailability request already finalized.")
 
-    # Check lock
-    locked_by = str(record.get("locked_by", "")).strip()
-    locked_at = str(record.get("locked_at", "")).strip()
-    if locked_by and locked_by != admin.email:
-        # Check if lock expired
-        try:
-            lock_time = datetime.strptime(locked_at, "%m/%d/%Y %I:%M %p")
-            if datetime.now() - lock_time < timedelta(minutes=LOCK_EXPIRY_MINUTES):
-                raise HTTPException(
-                    status_code=409,
-                    detail=f"Request currently handled by {locked_by}",
-                )
-        except ValueError:
-            pass
-
     # Red flag validation
     if body.red_flag and body.red_flag.value == "Yes" and not body.red_flag_reason:
         raise HTTPException(status_code=400, detail="Red flag reason is required.")
@@ -187,13 +172,15 @@ async def update_request_status(
                 if proof_col:
                     updates[proof_col] = body.red_flag_reason
 
-    # Clear lock
-    lock_by_col = headers.get("locked_by")
-    lock_at_col = headers.get("locked_at")
-    if lock_by_col:
-        updates[lock_by_col] = ""
-    if lock_at_col:
-        updates[lock_at_col] = ""
+    # Write rejection reason if provided
+    if body.status.value == "Rejected" and body.rejection_reason:
+        rej_col = headers.get(
+            "Reason for Rejection",
+            headers.get("rejection_reason", headers.get("Rejection Reason")),
+        )
+        if rej_col:
+            updates[rej_col] = body.rejection_reason
+
 
     if updates:
         await asyncio.to_thread(sheets_service.update_cells, sheet_name, row_num, updates)
@@ -208,90 +195,3 @@ async def update_request_status(
     )
 
     return {"message": f"Request {body.status.value.lower()} successfully."}
-
-
-@router.post("/requests/{request_id}/lock")
-async def lock_request(
-    request_id: str,
-    admin: UserInfo = Depends(require_admin),
-):
-    """Lock a request for the current admin."""
-    record, req_type = _find_request(request_id)
-    if not record:
-        raise HTTPException(status_code=404, detail="Request not found.")
-
-    # Check existing lock
-    locked_by = str(record.get("locked_by", "")).strip()
-    locked_at = str(record.get("locked_at", "")).strip()
-    if locked_by and locked_by != admin.email:
-        try:
-            lock_time = datetime.strptime(locked_at, "%m/%d/%Y %I:%M %p")
-            if datetime.now() - lock_time < timedelta(minutes=LOCK_EXPIRY_MINUTES):
-                raise HTTPException(
-                    status_code=409,
-                    detail=f"Request currently handled by {locked_by}",
-                )
-        except ValueError:
-            pass
-
-    sheet_name = _get_sheet_name(req_type)
-    headers = await asyncio.to_thread(sheets_service.get_header_indices, sheet_name)
-
-    rid_col = headers.get("request_id", headers.get("Request ID"))
-    row_num = await asyncio.to_thread(
-        sheets_service.find_row_by_value, sheet_name, rid_col, request_id
-    )
-    if not row_num:
-        raise HTTPException(status_code=404, detail="Request row not found.")
-
-    now = datetime.now().strftime("%m/%d/%Y %I:%M %p")
-    updates = {}
-    lock_by_col = headers.get("locked_by")
-    lock_at_col = headers.get("locked_at")
-    if lock_by_col:
-        updates[lock_by_col] = admin.email
-    if lock_at_col:
-        updates[lock_at_col] = now
-
-    if updates:
-        await asyncio.to_thread(sheets_service.update_cells, sheet_name, row_num, updates)
-
-    await asyncio.to_thread(cache.force_refresh_requests)
-
-    return {"message": "Request locked.", "locked_by": admin.email, "locked_at": now}
-
-
-@router.delete("/requests/{request_id}/lock")
-async def unlock_request(
-    request_id: str,
-    admin: UserInfo = Depends(require_admin),
-):
-    """Release lock on a request."""
-    record, req_type = _find_request(request_id)
-    if not record:
-        raise HTTPException(status_code=404, detail="Request not found.")
-
-    sheet_name = _get_sheet_name(req_type)
-    headers = await asyncio.to_thread(sheets_service.get_header_indices, sheet_name)
-
-    rid_col = headers.get("request_id", headers.get("Request ID"))
-    row_num = await asyncio.to_thread(
-        sheets_service.find_row_by_value, sheet_name, rid_col, request_id
-    )
-    if not row_num:
-        raise HTTPException(status_code=404, detail="Request row not found.")
-
-    updates = {}
-    lock_by_col = headers.get("locked_by")
-    lock_at_col = headers.get("locked_at")
-    if lock_by_col:
-        updates[lock_by_col] = ""
-    if lock_at_col:
-        updates[lock_at_col] = ""
-
-    if updates:
-        await asyncio.to_thread(sheets_service.update_cells, sheet_name, row_num, updates)
-
-    await asyncio.to_thread(cache.force_refresh_requests)
-
-    return {"message": "Lock released."}

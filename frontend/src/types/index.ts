@@ -52,7 +52,7 @@ export interface ClassAdditionPayload {
     assignment_requirement: string;
     reason: string;
     other_comments?: string;
-    approvers: string[];
+    approver: string;
 }
 
 export interface RequestItem {
@@ -96,4 +96,5 @@ export interface StatusUpdate {
     red_flag_reason?: string;
     replacement_instructor?: string;
     final_status?: string;
+    rejection_reason?: string;
 }
