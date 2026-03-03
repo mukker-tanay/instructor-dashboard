@@ -400,7 +400,7 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
                 <>
                     {/* Row 1: Batch Name + Program */}
                     <div className="form-row">
-                        <div className="form-group" style={{ minWidth: 0, overflow: 'hidden' }}>
+                        <div className="form-group" style={{ minWidth: 0 }}>
                             <label className="form-label form-label-required">Batch Name</label>
                             <SearchableDropdown
                                 options={batchDropdownOptions}
