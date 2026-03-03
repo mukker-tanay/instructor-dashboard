@@ -72,6 +72,8 @@ async def create_unavailability_request(
 ):
     """Raise unavailability request for one or more classes."""
     results = []
+    rows_to_append = []
+    rows_to_append = []
 
     for cls in body.classes:
         date_str = str(cls.get("date_of_class", cls.get("class_date", "")))
@@ -128,6 +130,7 @@ async def create_unavailability_request(
             "",                                                                 # locked_at
         ]
 
+        rows_to_append.append(row)
         await asyncio.to_thread(sheets_service.append_row, UNAVAILABILITY_SHEET, row)
         results.append({"request_id": request_id, "class": cls.get("class_title", cls.get("class_topic", ""))})
 
@@ -181,8 +184,21 @@ async def create_unavailability_request(
 
         asyncio.get_running_loop().create_task(_send_unavail())
 
-    # Refresh cache after write
-    await asyncio.to_thread(cache.force_refresh_requests)
+    # ─── Optimistic Cache Update ───
+    # Instead of blocking on a full sheet read, inject the new rows into the in-memory cache directly
+    try:
+        headers_map = await asyncio.to_thread(sheets_service.get_header_indices, UNAVAILABILITY_SHEET)
+        sorted_headers = sorted(headers_map.items(), key=lambda x: x[1])
+        
+        for row_data in rows_to_append:
+            cache_row = {}
+            for i, (col_name, col_idx) in enumerate(sorted_headers):
+                cache_row[col_name] = row_data[i] if i < len(row_data) else ""
+            cache.unavailability_requests.insert(0, cache_row)
+    except Exception as e:
+        logger.error(f"Optimistic cache update failed for unavailability: {e}")
+        # Fallback to background refresh if optimistic update fails
+        asyncio.get_running_loop().create_task(asyncio.to_thread(cache.force_refresh_requests))
 
     return {"message": "Unavailability request(s) submitted.", "requests": results}
 

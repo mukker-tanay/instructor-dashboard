@@ -6,6 +6,9 @@ from app.auth import decode_jwt
 from app.models import UserInfo
 from app.config import settings
 
+EMAIL_ALIASES = {
+    "shubham.yadav02@scaler.com": "shubham.yadav@scaler.com"
+}
 
 async def get_current_user(request: Request) -> UserInfo:
     """Extract and validate the current user from the JWT session cookie.
@@ -15,8 +18,12 @@ async def get_current_user(request: Request) -> UserInfo:
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
     payload = decode_jwt(token)
+    # Handle known aliases so instructors see their classes properly
+    raw_email = payload["sub"].lower()
+    primary_email = EMAIL_ALIASES.get(raw_email, raw_email)
+
     real_user = UserInfo(
-        email=payload["sub"],
+        email=primary_email,
         name=payload.get("name", ""),
         picture=payload.get("picture", ""),
         role=payload.get("role", "instructor"),
