@@ -1,8 +1,8 @@
-"""Instructor request endpoints — unavailability and class addition."""
+﻿"""Instructor request endpoints â€” unavailability and class addition."""
 
 import uuid
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -18,8 +18,7 @@ from app.slack import fire_slack_notification
 
 router = APIRouter(prefix="/api", tags=["requests"])
 
-
-
+IST = timezone(timedelta(hours=5, minutes=30))
 
 def _check_duplicate_unavailability(email: str, batch: str, class_title: str, date_str: str) -> None:
     """Block if an active (Pending) unavailability request already exists for the same class."""
@@ -85,7 +84,7 @@ async def create_unavailability_request(
         _check_duplicate_unavailability(user.email, batch, title, date_str)
 
         request_id = str(uuid.uuid4())
-        now = datetime.now().strftime("%m/%d/%Y %I:%M %p")
+        now = datetime.now(IST).strftime("%m/%d/%Y %I:%M %p")
 
         # Row order matches sheet headers exactly:
         # Instructor Email, Instructor Name, Program, Batch Name, SBAT Group ID,
@@ -134,7 +133,7 @@ async def create_unavailability_request(
         await asyncio.to_thread(sheets_service.append_row, UNAVAILABILITY_SHEET, row)
         results.append({"request_id": request_id, "class": cls.get("class_title", cls.get("class_topic", ""))})
 
-        # ─── Slack Workflow Notification ───
+        # â”€â”€â”€ Slack Workflow Notification â”€â”€â”€
         batch_name  = cls.get('batch_name', cls.get('sb_names', ''))
         program     = cls.get('program', '')
         sbat        = cls.get('sbat_group_id', '')
@@ -184,7 +183,7 @@ async def create_unavailability_request(
 
         asyncio.get_running_loop().create_task(_send_unavail())
 
-    # ─── Optimistic Cache Update ───
+    # â”€â”€â”€ Optimistic Cache Update â”€â”€â”€
     # Instead of blocking on a full sheet read, inject the new rows into the in-memory cache directly
     try:
         headers_map = await asyncio.to_thread(sheets_service.get_header_indices, UNAVAILABILITY_SHEET)
@@ -213,7 +212,7 @@ async def create_class_addition_request(
     _check_duplicate_class_addition(user.email, body.batch_name, body.date_of_class, body.time_of_class)
 
     request_id = str(uuid.uuid4())
-    now = datetime.now().strftime("%m/%d/%Y %I:%M %p")
+    now = datetime.now(IST).strftime("%m/%d/%Y %I:%M %p")
 
     # Row order matches sheet headers exactly:
     row = [
@@ -247,7 +246,7 @@ async def create_class_addition_request(
 
     await asyncio.to_thread(sheets_service.append_row, CLASS_ADDITION_SHEET, row)
 
-    # ─── Slack Workflow Notification ───
+    # â”€â”€â”€ Slack Workflow Notification â”€â”€â”€
     # Look up the approver's raw Slack user ID from cached Slack Member IDs
     def get_slack_id(name: str) -> str:
         """Return raw Slack member ID for a name, or empty string if not found."""

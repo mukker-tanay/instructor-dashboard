@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     admin_emails: str = ""
 
     # Cache
-    cache_refresh_seconds: int = 300
+    cache_refresh_seconds: int = 3600
 
     @property
     def admin_email_list(self) -> List[str]:
