@@ -207,15 +207,23 @@ async def get_batch_metadata(user: UserInfo = Depends(get_current_user)):
 
 @router.get("/my-batches")
 async def get_my_batches(user: UserInfo = Depends(get_current_user)):
-    """Return all classes for batches where this instructor is the majority
+    """Return batches from upcoming classes where this instructor is the majority
     instructor, grouped by batch → module. Includes RI-taken classes."""
     from collections import Counter, defaultdict
 
     email = user.email.lower()
+    now = datetime.now(IST)
 
-    # Step 1: group ALL classes by (batch, module) → list of classes
+    # Step 1: group UPCOMING classes by (batch, module) → list of classes
     groups: dict = defaultdict(list)
     for c in cache.classes:
+        # Only include upcoming classes
+        parsed_dt = parse_datetime(
+            str(c.get("class_date", "")),
+            str(c.get("time_of_day", "")),
+        )
+        if parsed_dt < now:
+            continue
         batch = str(c.get("sb_names", "")).strip()
         module = str(c.get("module_name", "")).strip()
         if batch and module:

@@ -271,6 +271,7 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
     const [error, setError] = useState('');
     const [batchOptions, setBatchOptions] = useState<string[]>([]);
     const [batchMeta, setBatchMeta] = useState<Record<string, BatchMeta>>({});
+    const [customBatchName, setCustomBatchName] = useState('');
 
     // Fetch instructor's own batches + metadata on open
     React.useEffect(() => {
@@ -288,6 +289,15 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
 
     /** When batch changes, auto-fill program and reset module */
     const handleBatchChange = (batch: string) => {
+        if (batch === 'Others') {
+            setForm(prev => ({
+                ...prev,
+                batch_name: 'Others',
+                program: '',
+                module_name: '',
+            }));
+            return;
+        }
         const meta = batchMeta[batch];
         setForm(prev => ({
             ...prev,
@@ -297,9 +307,13 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
         }));
     };
 
-    const moduleOptions = form.batch_name && batchMeta[form.batch_name]
+    const isOthersBatch = form.batch_name === 'Others';
+
+    const moduleOptions = form.batch_name && form.batch_name !== 'Others' && batchMeta[form.batch_name]
         ? [...batchMeta[form.batch_name].modules, 'Others']
         : ['Others'];
+
+    const batchDropdownOptions = [...batchOptions, 'Others'];
 
     /* Format YYYY-MM-DD → DD/MM/YYYY for display */
     const formatDateDisplay = (val: string) => {
@@ -312,6 +326,10 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
     const requiredFields = ['batch_name', 'class_title', 'module_name', 'date_of_class', 'time_of_class', 'reason'];
 
     const validate = () => {
+        if (isOthersBatch && !customBatchName.trim()) {
+            setError('Please enter a custom batch name.');
+            return false;
+        }
         for (const f of requiredFields) {
             if (!(form as any)[f]) {
                 const label = f.replace(/_/g, ' ');
@@ -332,7 +350,10 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
         setSubmitting(true);
         setError('');
         try {
-            await createClassAdditionRequest({ ...form, approvers });
+            const submitForm = isOthersBatch
+                ? { ...form, batch_name: customBatchName.trim() }
+                : form;
+            await createClassAdditionRequest({ ...submitForm, approvers });
             resetForm();
             onSuccess();
             onClose();
@@ -351,6 +372,7 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
             assignment_requirement: 'None', reason: '', other_comments: '',
         });
         setApprovers([]);
+        setCustomBatchName('');
         setStep('form');
         setError('');
     };
@@ -378,26 +400,40 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
                 <>
                     {/* Row 1: Batch Name + Program */}
                     <div className="form-row">
-                        <div className="form-group">
+                        <div className="form-group" style={{ minWidth: 0, overflow: 'hidden' }}>
                             <label className="form-label form-label-required">Batch Name</label>
                             <SearchableDropdown
-                                options={batchOptions}
+                                options={batchDropdownOptions}
                                 value={form.batch_name}
                                 onChange={handleBatchChange}
                                 placeholder="Select batch..."
                             />
                         </div>
-                        <div className="form-group">
+                        <div className="form-group" style={{ minWidth: 0 }}>
                             <label className="form-label form-label-required">Program</label>
                             <input
                                 className="form-input"
                                 value={form.program}
-                                readOnly
-                                placeholder="Auto-filled from batch"
-                                style={{ background: 'var(--bg-secondary)', cursor: 'not-allowed', color: form.program ? 'var(--text-primary)' : 'var(--text-muted)', backgroundImage: 'none' }}
+                                readOnly={!isOthersBatch}
+                                onChange={isOthersBatch ? e => update('program', e.target.value) : undefined}
+                                placeholder={isOthersBatch ? 'Enter program name' : 'Auto-filled from batch'}
+                                style={{ background: isOthersBatch ? 'var(--bg-input)' : 'var(--bg-secondary)', cursor: isOthersBatch ? 'text' : 'not-allowed', color: form.program ? 'var(--text-primary)' : 'var(--text-muted)', backgroundImage: 'none' }}
                             />
                         </div>
                     </div>
+                    {/* Manual batch name input when "Others" is selected */}
+                    {isOthersBatch && (
+                        <div className="form-group">
+                            <label className="form-label form-label-required">Custom Batch Name</label>
+                            <input
+                                className="form-input"
+                                value={customBatchName}
+                                onChange={e => setCustomBatchName(e.target.value)}
+                                placeholder="Enter batch name manually"
+                                style={{ backgroundImage: 'none' }}
+                            />
+                        </div>
+                    )}
 
                     {/* Row 2: Module Name + Class Title */}
                     <div className="form-row">
@@ -538,7 +574,7 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
                             <div key={k}>
                                 <span style={{ color: 'var(--text-muted)' }}>{FIELD_LABELS[k] || k.replace(/_/g, ' ')}: </span>
                                 <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
-                                    {k === 'date_of_class' ? formatDateDisplay(v) : v}
+                                    {k === 'date_of_class' ? formatDateDisplay(v) : k === 'batch_name' && v === 'Others' ? customBatchName || 'Others' : v}
                                 </span>
                             </div>
                         ))}
