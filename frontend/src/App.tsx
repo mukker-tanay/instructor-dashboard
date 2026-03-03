@@ -29,9 +29,9 @@ const LoginPage: React.FC = () => {
         <div className="login-page">
             <div className="login-card">
                 <div style={{ marginBottom: '16px' }}>
-                    <img src={logoImg} alt="Logo" style={{ height: '60px', objectFit: 'contain' }} />
+                    <img src={logoImg} alt="Logo" style={{ maxHeight: '48px', maxWidth: '100%', objectFit: 'contain' }} />
                 </div>
-                <h1 className="login-title">Instructor Unavailability Dashboard</h1>
+                <h1 className="login-title">Instructor Dashboard</h1>
                 <p className="login-subtitle">
                     Manage classes, raise requests, and track statuses — all in one place.
                 </p>

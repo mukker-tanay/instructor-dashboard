@@ -2,7 +2,7 @@
 
 :root {
   /* Colors - Clean light palette with blue accents */
-  --bg-primary: #f5f7fa;
+  --bg-primary: #f4f6f9;
   --bg-secondary: #edf0f5;
   --bg-card: #ffffff;
   --bg-card-hover: #f8fafc;
@@ -779,7 +779,7 @@ tr:last-child td {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-lg);
-  max-width: 420px;
+  max-width: 480px;
   width: 100%;
   animation: slideUp 0.3s ease;
 }
@@ -1469,7 +1469,7 @@ tr:last-child td {
   align-items: center;
   justify-content: center;
   padding: 8px 16px;
-  background: linear-gradient(135deg, #2d46d5, #253ce6);
+  background: linear-gradient(135deg, #184089, #0d429f);
   color: #fff;
   font-size: 0.8125rem;
   font-weight: 500;
