@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import Header from './components/Header';
+import logoImg from './images/logo.png';
 
 // Pages
 import InstructorDashboard from './pages/instructor/InstructorDashboard';
@@ -28,11 +29,9 @@ const LoginPage: React.FC = () => {
         <div className="login-page">
             <div className="login-card">
                 <div style={{ marginBottom: '16px' }}>
-                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
+                    <img src={logoImg} alt="Logo" style={{ height: '60px', objectFit: 'contain' }} />
                 </div>
-                <h1 className="login-title">Instructor Hub</h1>
+                <h1 className="login-title">Instructor Unavailability Dashboard</h1>
                 <p className="login-subtitle">
                     Manage classes, raise requests, and track statuses — all in one place.
                 </p>
