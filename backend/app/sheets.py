@@ -24,6 +24,7 @@ ID_MAPPING_SHEET = "ID mapping"
 BATCH_METRICS_SHEET = "batch_metrics"
 POLICIES_SHEET = "policies"
 SLACK_MEMBERS_SHEET = "Slack Member IDs"
+SLACK_GROUP_SHEET = "Slack Group IDs"
 
 # ... (existing code) ...
 

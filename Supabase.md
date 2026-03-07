@@ -27,21 +27,22 @@ Instructor Dashboard ──→ Vercel Backend ──→ Supabase (unlimited read
 ### Database Schema
 
 #### `classes` table
+*Unifies both upcoming_classes & past_classes into one tracked table*
 | Column | Type | Notes |
 |---|---|---|
-| `id` | `bigint` (PK, auto) | Internal ID |
-| `instructor_name` | `text` | |
+| `id` | `uuid` (PK) | Auto-generated |
+| `sbat_group_id` | `text` | |
 | `instructor_email` | `text` | Indexed for filtering |
-| `class_date` | `text` | Stored as-is from sheet (MM/DD/YYYY) |
-| `class_day` | `text` | |
-| `class_time` | `text` | |
-| `class_title` | `text` | |
+| `instructor_name` | `text` | |
+| `program` | `text` | |
+| `sb_names` | `text` | |
 | `module_name` | `text` | |
-| `sb_names` | `text` | Batch name(s) |
-| `program_name` | `text` | |
-| `class_type` | `text` | Regular / Optional |
-| `class_rating` | `text` | Nullable |
-| `class_category` | `text` | `upcoming` or `past` |
+| `class_topic` | `text` | |
+| `class_date` | `text` | |
+| `time_of_day` | `text` | |
+| `class_type` | `text` | |
+| `class_rating` | `text` | Exists in past_classes only |
+| `class_category` | `text` | `upcoming` or `past` (backend flag) |
 | `sheet_row_hash` | `text` | Hash of key fields for dedup during sync |
 | `synced_at` | `timestamptz` | Last sync timestamp |
 
@@ -49,52 +50,81 @@ Instructor Dashboard ──→ Vercel Backend ──→ Supabase (unlimited read
 | Column | Type | Notes |
 |---|---|---|
 | `id` | `uuid` (PK) | Same as `request_id` |
-| `instructor_name` | `text` | |
 | `instructor_email` | `text` | |
+| `instructor_name` | `text` | |
+| `program` | `text` | |
 | `batch_name` | `text` | |
+| `sbat_group_id` | `text` | |
+| `module_name` | `text` | |
 | `class_title` | `text` | |
-| `class_date` | `text` | |
-| `class_time` | `text` | |
-| `reason` | `text` | |
-| `topics_covered` | `text` | |
-| `batch_pulse` | `text` | |
-| `teaching_pace` | `text` | |
-| `suggested_replacement` | `text` | |
-| `status` | `text` | `Pending` / `Approved` / `Rejected` |
-| `admin_notes` | `text` | |
-| `approved_by` | `text` | |
-| `created_at` | `timestamptz` | |
+| `original_date_of_class` | `text` | MM/DD/YYYY |
+| `original_time_of_class` | `text` | HH:MM AM/PM IST |
+| `class_type` | `text` | |
+| `reason_for_unavailability`| `text` | |
+| `any_other_comments`| `text` | |
+| `suggested_instructors_for_replacement`| `text` | |
+| `topics_and_promises` | `text` | From Previous Class |
+| `batch_pulse_persona` | `text` | |
+| `recommended_teaching_pace`| `text` | & Style |
+| `raised_timestamp` | `timestamptz` | |
+| `raised_by` | `text` | |
+| `slack_thread_link` | `text` | |
+| `final_status` | `text` | Instructor chge / Reschedule class day / Non-class day |
+| `replacement_instructor` | `text` | |
+| `class_rating_in_case_of_replacement`| `text` | |
+| `ri_taking_the_class` | `text` | |
+| `red_flag_proof` | `text` | "If request has to be considered..." |
+| `status` | `text` | pending / approved / rejected |
+| `locked_by` | `text` | |
+| `locked_at` | `timestamptz` | |
 | `pushed_to_sheet` | `boolean` | `false` until hourly sync pushes it |
 
 #### `class_addition_requests` table
 | Column | Type | Notes |
 |---|---|---|
-| `id` | `uuid` (PK) | |
-| `instructor_name` | `text` | |
+| `id` | `uuid` (PK) | Same as `request_id` |
 | `instructor_email` | `text` | |
+| `instructor_name` | `text` | |
+| `program` | `text` | |
 | `batch_name` | `text` | |
-| `module_name` | `text` | |
 | `class_title` | `text` | |
-| `class_date` | `text` | |
-| `class_time` | `text` | |
-| `class_type` | `text` | |
-| `shift_other_classes` | `text` | |
-| `assignment_homework` | `text` | |
-| `reason` | `text` | |
-| `program_name` | `text` | |
-| `status` | `text` | `Pending` / `Approved` / `Rejected` |
-| `admin_notes` | `text` | |
-| `approved_by` | `text` | |
-| `created_at` | `timestamptz` | |
-| `pushed_to_sheet` | `boolean` | |
+| `module_name` | `text` | |
+| `date_of_class` | `text` | MM/DD/YYYY |
+| `time_of_class` | `text` | HH:MM AM/PM IST |
+| `class_type` | `text` | Regular/Optional |
+| `shift_other_classes_by_1` | `text` | Yes/No |
+| `contest_impact` | `text` | Will this addition affect... |
+| `assignment_requirement`| `text` | Requirement of Assignment... |
+| `reason_for_addition`| `text` | |
+| `other_comments` | `text` | |
+| `select_approver` | `text` | |
+| `submitted_by` | `text` | |
+| `time_stamp` | `timestamptz` | |
+| `slack_thread_link` | `text` | |
+| `actual_date_of_class` | `text` | |
+| `class_added_on_class_day`| `text` | Class Added on Class Day/Non-Class Day... |
+| `slack_link` | `text` | |
+| `red_flag` | `text` | |
+| `status` | `text` | pending / approved / rejected |
+| `locked_by` | `text` | |
+| `locked_at` | `timestamptz` | |
+| `rejection_reason` | `text` | |
+| `pushed_to_sheet` | `boolean` | `false` until hourly sync pushes it |
 
 #### `slack_members` table
 | Column | Type | Notes |
 |---|---|---|
-| `id` | `bigint` (PK, auto) | |
-| `name` | `text` | |
-| `member_id` | `text` | Slack user ID |
+| `id` | `text` (PK) | Raw Slack ID |
 | `email` | `text` | |
+| `name` | `text` | |
+
+#### `slack_groups` table
+| Column | Type | Notes |
+|---|---|---|
+| `usergroup_id` | `text` (PK) | Raw Slack Group ID |
+| `handle` | `text` | |
+| `name` | `text` | |
+| `tag` | `text` | |
 
 #### `batch_metrics` table
 | Column | Type | Notes |

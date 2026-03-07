@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.sheets import sheets_service
 from app.cache import cache
+from app.sync import run_full_sync
 from app.auth import router as auth_router
 from app.routers.classes import router as classes_router
 from app.routers.requests import router as requests_router
@@ -24,21 +25,18 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup: init sheets + warm cache + start background refresh."""
-    logger.info("Starting up...")
+    """Startup: initialize Google Sheets connection."""
+    logger.info("Starting up Backend (Supabase Target)...")
     try:
         sheets_service.initialize()
-        cache.refresh()
-        cache.start_background_refresh()
-        logger.info("Application started successfully.")
+        logger.info("Application started successfully. Cache disabled.")
     except Exception as e:
         logger.error(f"Startup failed: {e}")
-        logger.warning("Running in degraded mode — Sheets connection unavailable.")
+        logger.warning("Running in degraded mode — Sheets connection unavailable for Sync Engine.")
 
     yield
 
     # Shutdown
-    cache.stop_background_refresh()
     logger.info("Shutdown complete.")
 
 
@@ -69,9 +67,16 @@ app.include_router(policies_router)
 async def health_check():
     return {
         "status": "ok",
-        "cache": {
-            "classes": len(cache.classes),
-            "unavailability_requests": len(cache.unavailability_requests),
-            "class_addition_requests": len(cache.class_addition_requests),
-        },
+        "mode": "Supabase Connection Active",
+        "cache": "disabled"
     }
+
+@app.get("/api/sync")
+async def trigger_sync():
+    """External Cron triggers this hourly to sync sheets & supabase."""
+    try:
+        await run_full_sync()
+        return {"status": "ok", "message": "Synchronization completed successfully."}
+    except Exception as e:
+        logger.error(f"Manual Sync Failed: {e}")
+        return {"status": "error", "message": str(e)}

@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Query
 from app.dependencies import get_current_user
 from app.models import UserInfo
 from app.cache import cache
+from app.supabase_client import supabase
 
 router = APIRouter(prefix="/api/classes", tags=["classes"])
 
@@ -52,22 +53,18 @@ async def get_classes(
     user: UserInfo = Depends(get_current_user),
 ):
     """Get instructor's upcoming or past classes from cache."""
-    # Lazy Init: if cache is empty (cold start), fetch now
-    try:
-        cache.ensure_initialized()
-    except Exception:
-        pass  # If it fails, we still try to serve what we have or empty
-
     now = datetime.now(IST)
     email = user.email.lower()
+    
+    # Query Supabase dynamically
+    try:
+        response = supabase.table("classes").select("*").eq("instructor_email", email).eq("class_category", type).execute()
+        user_classes = response.data or []
+    except Exception as e:
+        print(f"[ERROR] Failed to fetch classes from Supabase: {e}")
+        user_classes = []
 
-    # Filter by instructor email
-    user_classes = [
-        c for c in cache.classes
-        if str(c.get("instructor_email", "")).strip().lower() == email
-    ]
-
-    # Parse date + time for accurate comparison
+    # Parse date + time for accurate sorting
     for c in user_classes:
         c["_parsed_dt"] = parse_datetime(
             str(c.get("class_date", "")),
@@ -107,43 +104,38 @@ async def get_classes(
 @router.get("/batch-options")
 async def get_batch_options(user: UserInfo = Depends(get_current_user)):
     """Get unique batch names for the current instructor (for dropdowns)."""
-    # Lazy Init
-    try:
-        cache.ensure_initialized()
-    except Exception:
-        pass
-
     email = user.email.lower()
     batches = set()
-    for c in cache.classes:
-        if str(c.get("instructor_email", "")).strip().lower() == email:
+    try:
+        # We only really need to check upcoming classes for batch dropdown options
+        response = supabase.table("classes").select("sb_names").eq("instructor_email", email).execute()
+        for c in (response.data or []):
             batch = str(c.get("sb_names", "")).strip()
             if batch:
                 batches.add(batch)
+    except Exception as e:
+        print(f"[ERROR] Failed to fetch batch options: {e}")
     return {"batches": sorted(batches)}
 
 
 @router.get("/instructors")
 async def get_instructor_options(user: UserInfo = Depends(get_current_user)):
     """Get unique instructor names from upcoming classes (for replacement dropdown)."""
-    # Lazy Init
-    try:
-        cache.ensure_initialized()
-    except Exception:
-        pass
-
     now = datetime.now(IST)
     instructors = set()
-    for c in cache.classes:
-        # Only include instructors from upcoming classes
-        parsed = parse_datetime(
-            str(c.get("class_date", "")),
-            str(c.get("time_of_day", "")),
-        )
-        if parsed >= now:
-            name = str(c.get("instructor_name", "")).strip()
-            if name and "scaler instructor" not in name.lower():
-                instructors.add(name)
+    try:
+        response = supabase.table("classes").select("instructor_name, class_date, time_of_day").eq("class_category", "upcoming").execute()
+        for c in (response.data or []):
+            parsed = parse_datetime(
+                str(c.get("class_date", "")),
+                str(c.get("time_of_day", "")),
+            )
+            if parsed >= now:
+                name = str(c.get("instructor_name", "")).strip()
+                if name and "scaler instructor" not in name.lower():
+                    instructors.add(name)
+    except Exception as e:
+        print(f"[ERROR] Failed to fetch instructors: {e}")
     return {"instructors": sorted(instructors)}
 
 
@@ -216,7 +208,14 @@ async def get_my_batches(user: UserInfo = Depends(get_current_user)):
 
     # Step 1: group UPCOMING classes by (batch, module) → list of classes
     groups: dict = defaultdict(list)
-    for c in cache.classes:
+    try:
+        resp = supabase.table("classes").select("*").eq("class_category", "upcoming").execute()
+        all_upcoming = resp.data or []
+    except Exception as e:
+        print(f"[ERROR] my-batches supabase error: {e}")
+        all_upcoming = []
+
+    for c in all_upcoming:
         # Only include upcoming classes
         parsed_dt = parse_datetime(
             str(c.get("class_date", "")),
