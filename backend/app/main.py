@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
 from app.config import settings
 from app.sheets import sheets_service
@@ -54,6 +55,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Compress large JSON responses (Crucial for Vercel Serverless large datasets)
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Routers
 app.include_router(auth_router)
