@@ -5,7 +5,6 @@ from fastapi import APIRouter, Depends, Query
 
 from app.dependencies import get_current_user
 from app.models import UserInfo
-from app.cache import cache
 from app.supabase_client import supabase
 
 router = APIRouter(prefix="/api/classes", tags=["classes"])
@@ -142,58 +141,46 @@ async def get_instructor_options(user: UserInfo = Depends(get_current_user)):
 @router.get("/batch-metadata")
 async def get_batch_metadata(user: UserInfo = Depends(get_current_user)):
     """Return program + upcoming module names per batch for the current instructor."""
-    # Lazy Init
-    try:
-        cache.ensure_initialized()
-    except Exception:
-        pass
-
     email = user.email.lower()
     now = datetime.now(IST)
-    # batch -> { program, modules set }
     meta: dict = {}
-    
-    # 1. First pass: Identify Program for every batch (Global Lookup)
+
+    try:
+        # Single query: all classes (global) to build batch->program map + instructor's classes for modules
+        resp = supabase.table("classes").select("instructor_email,sb_names,program,module_name,class_date,time_of_day").execute()
+        all_classes = resp.data or []
+    except Exception as e:
+        print(f"[ERROR] batch-metadata supabase error: {e}")
+        return {"batch_metadata": {}}
+
+    # 1. First pass: global batch -> program map
     batch_programs = {}
-    for c in cache.classes:
+    for c in all_classes:
         batch = str(c.get("sb_names", "")).strip()
         program = str(c.get("program", "")).strip()
         if batch and program:
             batch_programs[batch] = program
 
-    # 2. Second pass: Build metadata ONLY for instructor's batches
-    for c in cache.classes:
-        # Strict Filter: Only process if this instructor taught the class
+    # 2. Second pass: instructor's batches + upcoming modules
+    for c in all_classes:
         if str(c.get("instructor_email", "")).strip().lower() != email:
             continue
-
         batch = str(c.get("sb_names", "")).strip()
         if not batch:
             continue
-
         if batch not in meta:
-            meta[batch] = {
-                # Use global program lookup, fall back to empty string
-                "program": batch_programs.get(batch, ""),
-                "modules": set(),
-            }
-
-        # Parse date to check if upcoming
+            meta[batch] = {"program": batch_programs.get(batch, ""), "modules": set()}
         date_str = str(c.get("class_date", "")).strip()
         time_str = str(c.get("time_of_day", "")).strip()
-        if date_str:
-            dt = parse_datetime(date_str, time_str)
-            if dt >= now:
-                mod = str(c.get("module_name", "")).strip()
-                if mod:
-                    meta[batch]["modules"].add(mod)
+        if date_str and parse_datetime(date_str, time_str) >= now:
+            mod = str(c.get("module_name", "")).strip()
+            if mod:
+                meta[batch]["modules"].add(mod)
 
-    result = {}
-    for batch, info in meta.items():
-        result[batch] = {
-            "program": info["program"],
-            "modules": sorted(info["modules"]),
-        }
+    result = {
+        batch: {"program": info["program"], "modules": sorted(info["modules"])}
+        for batch, info in meta.items()
+    }
     return {"batch_metadata": result}
 
 

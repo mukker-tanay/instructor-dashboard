@@ -155,16 +155,12 @@ async def impersonate(request: Request):
         raise HTTPException(status_code=400, detail="Email is required")
 
     # Look up the real name from class data
-    from app.cache import cache
+    from app.supabase_client import supabase
     real_name = target_email.split("@")[0]  # fallback
     try:
-        cache.ensure_initialized()
-        for c in cache.classes:
-            if str(c.get("instructor_email", "")).strip().lower() == target_email.lower():
-                found = str(c.get("instructor_name", "")).strip()
-                if found:
-                    real_name = found
-                    break
+        res = supabase.table("classes").select("instructor_name").eq("instructor_email", target_email.lower()).limit(1).execute()
+        if res.data and res.data[0].get("instructor_name"):
+            real_name = str(res.data[0]["instructor_name"]).strip()
     except Exception:
         pass
 
