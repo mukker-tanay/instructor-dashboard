@@ -1,8 +1,9 @@
-﻿"""Instructor request endpoints â€” unavailability and class addition."""
+"""Instructor request endpoints - unavailability and class addition."""
 
 import uuid
 import asyncio
-from datetime import datetime, timedelta, timezone, timezone
+import logging
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -12,10 +13,11 @@ from app.models import (
     UnavailabilityRequestCreate,
     ClassAdditionRequestCreate,
 )
-from app.cache import cache
 from app.supabase_client import supabase
 from app.sheets import sheets_service, UNAVAILABILITY_SHEET, CLASS_ADDITION_SHEET
 from app.slack import fire_slack_notification
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["requests"])
 
@@ -58,8 +60,6 @@ async def create_unavailability_request(
 ):
     """Raise unavailability request for one or more classes."""
     results = []
-    rows_to_append = []
-    rows_to_append = []
 
     for cls in body.classes:
         date_str = str(cls.get("date_of_class", cls.get("class_date", "")))
@@ -105,7 +105,7 @@ async def create_unavailability_request(
             "locked_at": None,
             "pushed_to_sheet": False
         }
-        
+
         try:
             supabase.table("unavailability_requests").insert(supabase_record).execute()
             results.append({"request_id": request_id, "class": cls.get("class_title", cls.get("class_topic", ""))})
@@ -113,7 +113,7 @@ async def create_unavailability_request(
             logger.error(f"Failed to insert unavailability request into Supabase: {e}")
             raise HTTPException(status_code=500, detail="Database insertion failed")
 
-        # â”€â”€â”€ Slack Workflow Notification â”€â”€â”€
+        # --- Slack Workflow Notification ---
         batch_name  = cls.get('batch_name', cls.get('sb_names', ''))
         program     = cls.get('program', '')
         sbat        = cls.get('sbat_group_id', '')
@@ -121,18 +121,18 @@ async def create_unavailability_request(
         class_title = cls.get('class_title', cls.get('class_topic', ''))
         class_type  = cls.get('class_type', '')
 
-        # Look up raw Slack ID for suggested_replacement from cached Slack member IDs
+        # Look up Slack user ID for suggested replacement from Supabase
         def get_slack_id(name: str) -> str:
-            """Return raw Slack member ID for a name, or empty string if not found."""
             if not name:
                 return ""
-            clean = name.strip().lower()
-            for r in cache.slack_members:
-                if str(r.get("name", "")).strip().lower() == clean:
-                    return str(r.get("id", "")).strip()
+            try:
+                res = supabase.table("slack_members").select("id").ilike("name", name.strip()).limit(1).execute()
+                if res.data:
+                    return str(res.data[0].get("id", "")).strip()
+            except Exception as e:
+                print(f"[ERROR] Slack member lookup failed: {e}")
             return ""
 
-        # Look up Slack user ID for suggested replacement
         slack_id = get_slack_id(body.suggested_replacement or "")
         print(f"[DEBUG] Suggested replacement: name='{body.suggested_replacement}' -> slack_id='{slack_id}'")
 
@@ -162,8 +162,6 @@ async def create_unavailability_request(
             await send_workflow_payload(settings.slack_unavailability_webhook, data)
 
         asyncio.get_running_loop().create_task(_send_unavail())
-
-
 
     return {"message": "Unavailability request(s) submitted.", "requests": results}
 
@@ -218,16 +216,17 @@ async def create_class_addition_request(
         logger.error(f"Failed to insert class addition request into Supabase: {e}")
         raise HTTPException(status_code=500, detail="Database insertion failed")
 
-    # â”€â”€â”€ Slack Workflow Notification â”€â”€â”€
-    # Look up the approver's raw Slack user ID from cached Slack Member IDs
+    # --- Slack Workflow Notification ---
+    # Look up approver Slack ID from Supabase
     def get_slack_id(name: str) -> str:
-        """Return raw Slack member ID for a name, or empty string if not found."""
         if not name:
             return ""
-        clean = name.strip().lower()
-        for r in cache.slack_members:
-            if str(r.get("name", "")).strip().lower() == clean:
-                return str(r.get("id", "")).strip()
+        try:
+            res = supabase.table("slack_members").select("id").ilike("name", name.strip()).limit(1).execute()
+            if res.data:
+                return str(res.data[0].get("id", "")).strip()
+        except Exception as e:
+            print(f"[ERROR] Slack member lookup failed: {e}")
         return ""
 
     # Only the first approver is used (the Workflow variable expects a single user ID)
@@ -258,46 +257,29 @@ async def create_class_addition_request(
 
     asyncio.create_task(_send_addition())
 
-    await asyncio.to_thread(cache.force_refresh_requests)
-
     return {"message": "Class addition request submitted.", "request_id": request_id}
 
 
 @router.get("/my-requests")
 async def get_my_requests(user: UserInfo = Depends(get_current_user)):
-    """Get status of all requests raised by the user."""
-    # Lazy Init
-    try:
-        cache.ensure_initialized()
-    except Exception:
-        pass
-
+    """Get status of all requests raised by the user from Supabase."""
     email = user.email.lower()
+    unavailability = []
+    additions = []
 
-    unavailability = [
-        {**r, "request_type": "unavailability"}
-        for r in cache.unavailability_requests
-        if str(r.get("Instructor Email", "")).strip().lower() == email
-    ]
+    try:
+        res = supabase.table("unavailability_requests").select("*").eq("instructor_email", email).order("raised_timestamp", desc=True).execute()
+        unavailability = [{**r, "request_type": "unavailability"} for r in (res.data or [])]
+    except Exception as e:
+        print(f"[ERROR] Failed to fetch unavailability requests: {e}")
 
-    additions = [
-        {**r, "request_type": "class_addition"}
-        for r in cache.class_addition_requests
-        if str(r.get("Instructor Email", "")).strip().lower() == email
-    ]
+    try:
+        res = supabase.table("class_addition_requests").select("*").eq("instructor_email", email).order("time_stamp", desc=True).execute()
+        additions = [{**r, "request_type": "class_addition"} for r in (res.data or [])]
+    except Exception as e:
+        print(f"[ERROR] Failed to fetch class addition requests: {e}")
 
     all_requests = unavailability + additions
-
-    # Sort by timestamp descending
-    def sort_key(r):
-        ts = r.get("Raised Timestamp", r.get("Time stamp", r.get("timestamp", "")))
-        for fmt in ("%m/%d/%Y %I:%M %p", "%m/%d/%Y %H:%M", "%Y-%m-%d %H:%M"):
-            try:
-                return datetime.strptime(str(ts).strip(), fmt)
-            except ValueError:
-                continue
-        return datetime.min
-
-    all_requests.sort(key=sort_key, reverse=True)
+    all_requests.sort(key=lambda r: str(r.get("raised_timestamp") or r.get("time_stamp") or ""), reverse=True)
 
     return {"requests": all_requests, "total": len(all_requests)}

@@ -70,7 +70,6 @@ class SheetsService:
                     self._client = gspread.authorize(creds)
                     self._spreadsheet = self._client.open_by_key(settings.spreadsheet_id)
                     logger.info("Google Sheets service initialized successfully (JSON).")
-                    self._ensure_tracking_columns()
                     return
                 except json.JSONDecodeError as e:
                     logger.error(f"GOOGLE_CREDENTIALS_JSON is set but contains invalid JSON: {e}")
@@ -101,32 +100,14 @@ class SheetsService:
             self._spreadsheet = self._client.open_by_key(settings.spreadsheet_id)
             logger.info("Google Sheets service initialized successfully (File).")
 
-            # Ensure tracking columns exist in request sheets
-            self._ensure_tracking_columns()
+            # Tracking columns no longer needed in Sheets — managed by Supabase
         except Exception as e:
             import traceback
             logger.error(f"Failed to initialize Google Sheets service: {e}\n{traceback.format_exc()}")
             raise
 
-    # ── Tracking column auto-setup ──────────────────────────────────
-    TRACKING_COLS = ["request_id", "status", "locked_by", "locked_at"]
-
-    def _ensure_tracking_columns(self):
-        """Add request_id/status/locked_by/locked_at headers if missing."""
-        for sheet_name in (UNAVAILABILITY_SHEET, CLASS_ADDITION_SHEET):
-            try:
-                ws = self.spreadsheet.worksheet(sheet_name)
-                headers = ws.row_values(1)
-                missing = [c for c in self.TRACKING_COLS if c not in headers]
-                if missing:
-                    start_col = len(headers) + 1
-                    for i, col_name in enumerate(missing):
-                        ws.update_cell(1, start_col + i, col_name)
-                    logger.info(
-                        f"Added missing tracking columns to '{sheet_name}': {missing}"
-                    )
-            except Exception as e:
-                logger.warning(f"Could not verify tracking columns in '{sheet_name}': {e}")
+    # Tracking columns (request_id, status, locked_by, locked_at) are now
+    # managed exclusively in Supabase — no Sheet-side enforcement needed.
 
     @property
     def spreadsheet(self) -> gspread.Spreadsheet:
