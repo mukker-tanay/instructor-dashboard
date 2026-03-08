@@ -15,7 +15,8 @@ from app.models import (
 )
 from app.supabase_client import supabase
 from app.sheets import sheets_service, UNAVAILABILITY_SHEET, CLASS_ADDITION_SHEET
-from app.slack import fire_slack_notification
+from app.slack import fire_slack_notification, send_workflow_payload
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -155,13 +156,8 @@ async def create_unavailability_request(
             "teaching_pace_style":   body.teaching_pace_style,
         }
 
-        _data = workflow_data  # capture per-iteration value for the closure
-        async def _send_unavail(data=_data):
-            from app.slack import send_workflow_payload
-            from app.config import settings
-            await send_workflow_payload(settings.slack_unavailability_webhook, data)
-
-        asyncio.get_running_loop().create_task(_send_unavail())
+        # Send Slack Workflow notification (awaited to ensure it fires on Vercel serverless)
+        await send_workflow_payload(settings.slack_unavailability_webhook, workflow_data)
 
     return {"message": "Unavailability request(s) submitted.", "requests": results}
 
@@ -250,12 +246,8 @@ async def create_class_addition_request(
         "approver":               approver_id,
     }
 
-    async def _send_addition():
-        from app.slack import send_workflow_payload
-        from app.config import settings
-        await send_workflow_payload(settings.slack_class_addition_webhook, workflow_data)
-
-    asyncio.create_task(_send_addition())
+    # Send Slack Workflow notification (awaited to ensure it fires on Vercel serverless)
+    await send_workflow_payload(settings.slack_class_addition_webhook, workflow_data)
 
     return {"message": "Class addition request submitted.", "request_id": request_id}
 
@@ -269,13 +261,33 @@ async def get_my_requests(user: UserInfo = Depends(get_current_user)):
 
     try:
         res = supabase.table("unavailability_requests").select("*").eq("instructor_email", email).order("raised_timestamp", desc=True).execute()
-        unavailability = [{**r, "request_type": "unavailability"} for r in (res.data or [])]
+        for r in (res.data or []):
+            # Add frontend-compatible aliases (old Google Sheets header names)
+            r["Class Title"] = r.get("class_title", "")
+            r["Module Name"] = r.get("module_name", "")
+            r["Batch Name"] = r.get("batch_name", "")
+            r["Original Date of Class (MM/DD/YYYY)"] = r.get("original_date_of_class", "")
+            r["Original Time of Class (HH:MM AM/PM) IST"] = r.get("original_time_of_class", "")
+            r["Raised Timestamp"] = r.get("raised_timestamp", "")
+            r["Reason for Unavailability"] = r.get("reason_for_unavailability", "")
+            r["Status"] = r.get("status", "Pending")
+            unavailability.append({**r, "request_type": "unavailability"})
     except Exception as e:
         print(f"[ERROR] Failed to fetch unavailability requests: {e}")
 
     try:
         res = supabase.table("class_addition_requests").select("*").eq("instructor_email", email).order("time_stamp", desc=True).execute()
-        additions = [{**r, "request_type": "class_addition"} for r in (res.data or [])]
+        for r in (res.data or []):
+            # Add frontend-compatible aliases
+            r["Class Title"] = r.get("class_title", "")
+            r["Module Name"] = r.get("module_name", "")
+            r["Batch Name"] = r.get("batch_name", "")
+            r["Date of Class (MM/DD/YYYY)"] = r.get("date_of_class", "")
+            r["Time of Class (HH:MM AM/PM) IST"] = r.get("time_of_class", "")
+            r["Time stamp"] = r.get("time_stamp", "")
+            r["Reason for Addition of Class"] = r.get("reason_for_addition", "")
+            r["Status"] = r.get("status", "Pending")
+            additions.append({**r, "request_type": "class_addition"})
     except Exception as e:
         print(f"[ERROR] Failed to fetch class addition requests: {e}")
 
