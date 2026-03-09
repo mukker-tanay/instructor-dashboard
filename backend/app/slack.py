@@ -19,9 +19,10 @@ async def send_workflow_payload(webhook_url: str, data: dict) -> None:
         logger.warning("Slack Workflow webhook URL not configured; skipping.")
         return
 
-    # Only strip None values — Slack requires ALL declared variables to be present,
-    # even if empty string. Missing keys cause 'invalid_workflow_input' 400 errors.
-    clean_data = {k: (v if v is not None else "") for k, v in data.items()}
+    # Only replace None or empty string values with "None" — Slack requires ALL 
+    # declared variables to be present and non-empty. Missing or empty keys cause 
+    # 'invalid_workflow_input' 400 errors.
+    clean_data = {k: (v if v else "None") for k, v in data.items()}
 
     logger.info(f"Slack Workflow payload keys: {list(clean_data.keys())}")
     logger.debug(f"Slack Workflow payload: {clean_data}")
