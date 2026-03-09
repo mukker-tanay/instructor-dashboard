@@ -230,10 +230,60 @@ async def push_requests():
         logger.error(f"Failed pushing class addition requests: {e}")
 
 
+async def sync_deletions():
+    """Remove rows from Google Sheets that no longer exist in Supabase."""
+    logger.info("Starting deletion sync (Sheets cleanup)...")
+
+    for table, sheet in [
+        ("unavailability_requests", UNAVAILABILITY_SHEET),
+        ("class_addition_requests", CLASS_ADDITION_SHEET),
+    ]:
+        try:
+            # Get all IDs from Supabase
+            res = supabase.table(table).select("id").execute()
+            supabase_ids = {r["id"] for r in (res.data or [])}
+
+            # Get all Request IDs from the Sheet (column where ID is stored)
+            # First, find the column index for Request ID / id
+            headers = await asyncio.to_thread(sheets_service.get_header_indices, sheet)
+            # The request ID column could be labeled "Request ID" or be the last meaningful column
+            id_col = headers.get("Request ID") or headers.get("request_id")
+            if not id_col:
+                logger.warning(f"Could not find Request ID column in '{sheet}', skipping deletion sync.")
+                continue
+
+            worksheet = await asyncio.to_thread(lambda: sheets_service.spreadsheet.worksheet(sheet))
+            col_values = await asyncio.to_thread(worksheet.col_values, id_col)
+
+            # Find rows to delete (skip header row at index 0)
+            rows_to_delete = []
+            for i, val in enumerate(col_values):
+                if i == 0:  # skip header
+                    continue
+                val = str(val).strip()
+                if val and val not in supabase_ids:
+                    rows_to_delete.append(i + 1)  # 1-indexed row number
+
+            # Delete in reverse order so row indices don't shift
+            for row_num in reversed(rows_to_delete):
+                try:
+                    await asyncio.to_thread(sheets_service.delete_row, sheet, row_num)
+                    logger.info(f"Deleted orphaned row {row_num} from '{sheet}'")
+                except Exception as e:
+                    logger.warning(f"Failed to delete row {row_num} from '{sheet}': {e}")
+
+            if rows_to_delete:
+                logger.info(f"Cleaned up {len(rows_to_delete)} orphaned row(s) from '{sheet}'")
+
+        except Exception as e:
+            logger.error(f"Deletion sync failed for '{sheet}': {e}")
+
+
 async def run_full_sync():
     """Runs the complete Sync Engine combining Pulls and Pushes securely."""
     logger.info("--- SYNC ENGINE STARTED ---")
     await pull_classes()
     await pull_slack_data()
     await push_requests()
+    await sync_deletions()
     logger.info("--- SYNC ENGINE COMPLETED ---")

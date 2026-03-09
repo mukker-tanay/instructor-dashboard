@@ -192,7 +192,7 @@ async def delete_requests(
     body: BulkDeleteRequest,
     admin: UserInfo = Depends(require_admin),
 ):
-    """Bulk delete requests from Supabase and Google Sheets."""
+    """Bulk delete requests from Supabase (Sheets cleanup happens via /api/sync)."""
     if not body.request_ids:
         raise HTTPException(status_code=400, detail="No request IDs provided.")
 
@@ -206,22 +206,12 @@ async def delete_requests(
             continue
 
         table = "unavailability_requests" if req_type == "unavailability" else "class_addition_requests"
-        sheet = UNAVAILABILITY_SHEET if req_type == "unavailability" else CLASS_ADDITION_SHEET
 
-        # 1. Delete from Supabase
         try:
             supabase.table(table).delete().eq("id", rid).execute()
         except Exception as e:
             errors.append(f"{rid}: Supabase delete failed ({e})")
             continue
-
-        # 2. Delete from Google Sheet (best-effort, col 1 = Request ID)
-        try:
-            row_num = sheets_service.find_row_by_value(sheet, 1, rid)
-            if row_num:
-                sheets_service.delete_row(sheet, row_num)
-        except Exception as e:
-            logger.warning(f"Sheet delete for {rid} failed (non-fatal): {e}")
 
         deleted_count += 1
 
