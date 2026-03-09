@@ -63,6 +63,9 @@ export const getAdminRequests = (status = 'all', requestType = 'all') =>
 export const updateRequestStatus = (requestId: string, data: StatusUpdate) =>
     api.patch(`/admin/requests/${requestId}/status`, data).then(r => r.data);
 
+export const deleteRequests = (requestIds: string[]) =>
+    api.post<{ message: string; deleted: number; errors: string[] }>('/admin/requests/delete', { request_ids: requestIds }).then(r => r.data);
+
 /* ── Health ── */
 export const healthCheck = () => api.get('/health').then(r => r.data);
 

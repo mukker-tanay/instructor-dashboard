@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getAdminRequests, updateRequestStatus, getInstructorOptions } from '../../api/client';
+import { getAdminRequests, updateRequestStatus, getInstructorOptions, deleteRequests } from '../../api/client';
 import type { RequestItem, StatusUpdate } from '../../types';
 import Modal from '../../components/Modal';
 
@@ -10,6 +10,10 @@ const AdminDashboard: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [selectedRequest, setSelectedRequest] = useState<RequestItem | null>(null);
     const [showModal, setShowModal] = useState(false);
+
+    // Selection state for bulk delete
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [deleting, setDeleting] = useState(false);
 
     // Shared form state
     const [statusVal, setStatusVal] = useState<'Approved' | 'Rejected'>('Approved');
@@ -37,6 +41,7 @@ const AdminDashboard: React.FC = () => {
             console.error(err);
         } finally {
             setLoading(false);
+            setSelectedIds(new Set()); // Clear selection on refresh
         }
     }, [filter, typeFilter]);
 
@@ -44,18 +49,56 @@ const AdminDashboard: React.FC = () => {
         fetchRequests();
     }, [fetchRequests]);
 
+    // --- Selection helpers ---
+    const getRequestId = (r: RequestItem): string =>
+        String(r.id || r.request_id || r['Request ID'] || '');
+
+    const toggleSelect = (id: string) => {
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedIds.size === requests.length) {
+            setSelectedIds(new Set());
+        } else {
+            setSelectedIds(new Set(requests.map(getRequestId)));
+        }
+    };
+
+    const handleBulkDelete = async () => {
+        if (selectedIds.size === 0) return;
+        const confirmed = window.confirm(
+            `Are you sure you want to permanently delete ${selectedIds.size} request(s)? This will remove them from both the database and Google Sheets.`
+        );
+        if (!confirmed) return;
+
+        setDeleting(true);
+        try {
+            await deleteRequests(Array.from(selectedIds));
+            fetchRequests();
+        } catch (err: any) {
+            alert(err.response?.data?.detail || 'Failed to delete requests.');
+        } finally {
+            setDeleting(false);
+        }
+    };
+
+    // --- Approval modal ---
     const openApproval = async (r: RequestItem) => {
         setSelectedRequest(r);
         setError('');
 
-        // Pre-fill fields if already approved
         const currentStatus = String(r.status || r.Status || 'Pending').trim();
-        setStatusVal(currentStatus === 'Approved' ? 'Approved' : 'Approved'); // Default to Approved if opening edit, or if pending
+        setStatusVal(currentStatus === 'Approved' ? 'Approved' : 'Approved');
 
         if (currentStatus === 'Approved' && r.request_type === 'class_addition') {
             const payment = String(r['Class Added on Class Day/Non-Class Day Sanctioned/Non-Sanctioned'] || r['Sanctioned/Non-Sanctioned'] || 'Sanctioned');
             setPaymentStatus(payment);
-
             const rf = String(r['Red Flag'] || 'No');
             setRedFlag(rf);
         } else {
@@ -65,12 +108,10 @@ const AdminDashboard: React.FC = () => {
             setRejectionReason('');
         }
 
-        // Reset unavailability fields
         setFinalStatus('');
         setReplacementInstructor('');
         setRedFlagProof('');
 
-        // Fetch instructors for replacement dropdown if unavailability
         if (r.request_type === 'unavailability') {
             getInstructorOptions().then(d => setInstructorOptions(d.instructors)).catch(() => { });
         }
@@ -85,7 +126,6 @@ const AdminDashboard: React.FC = () => {
 
         const isUnavail = selectedRequest.request_type === 'unavailability';
 
-        // Class addition validations
         if (!isUnavail && statusVal === 'Approved' && redFlag === 'Yes' && !redFlagReason) {
             setError('Red flag reason is required.');
             return;
@@ -94,18 +134,14 @@ const AdminDashboard: React.FC = () => {
         setSubmitting(true);
         setError('');
         try {
-            const payload: StatusUpdate = {
-                status: statusVal,
-            };
+            const payload: StatusUpdate = { status: statusVal };
 
             if (statusVal === 'Approved') {
                 if (isUnavail) {
-                    // Unavailability approval fields
                     payload.final_status = finalStatus || undefined;
                     payload.replacement_instructor = replacementInstructor || undefined;
                     payload.red_flag_reason = redFlagProof || undefined;
                 } else {
-                    // Class addition approval fields
                     payload.payment_status = paymentStatus as any;
                     payload.red_flag = redFlag as any;
                     payload.red_flag_reason = redFlag === 'Yes' ? redFlagReason : undefined;
@@ -142,7 +178,7 @@ const AdminDashboard: React.FC = () => {
                 </div>
             </div>
 
-            {/* Filters */}
+            {/* Filters + Bulk Actions */}
             <div className="filters-bar">
                 <div className="tabs" style={{ margin: 0 }}>
                     <button className={`tab ${filter === 'Pending' ? 'active' : ''}`} onClick={() => setFilter('Pending')}>Pending</button>
@@ -155,6 +191,45 @@ const AdminDashboard: React.FC = () => {
                 </div>
             </div>
 
+            {/* Bulk action bar — visible when requests exist */}
+            {!loading && requests.length > 0 && (
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '10px 16px',
+                    marginBottom: '12px',
+                    background: selectedIds.size > 0 ? 'var(--danger-bg, #fff1f0)' : 'var(--surface-elevated, #f8f9fa)',
+                    borderRadius: 'var(--radius-md, 8px)',
+                    transition: 'background 0.2s ease',
+                }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 500 }}>
+                        <input
+                            type="checkbox"
+                            checked={selectedIds.size === requests.length && requests.length > 0}
+                            onChange={toggleSelectAll}
+                            style={{ width: '16px', height: '16px', accentColor: 'var(--primary, #4f46e5)', cursor: 'pointer' }}
+                        />
+                        Select All
+                    </label>
+                    {selectedIds.size > 0 && (
+                        <>
+                            <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+                                {selectedIds.size} selected
+                            </span>
+                            <button
+                                className="btn btn-danger btn-sm"
+                                onClick={handleBulkDelete}
+                                disabled={deleting}
+                                style={{ marginLeft: 'auto' }}
+                            >
+                                {deleting ? 'Deleting...' : `Delete ${selectedIds.size} Request${selectedIds.size > 1 ? 's' : ''}`}
+                            </button>
+                        </>
+                    )}
+                </div>
+            )}
+
             {loading ? (
                 <div className="loading-container"><div className="spinner" /></div>
             ) : requests.length === 0 ? (
@@ -164,6 +239,7 @@ const AdminDashboard: React.FC = () => {
                 </div>
             ) : (
                 requests.map((r, i) => {
+                    const rid = getRequestId(r);
                     const status = getStatus(r);
                     const isUnavail = r.request_type === 'unavailability';
                     const date = isUnavail
@@ -178,15 +254,38 @@ const AdminDashboard: React.FC = () => {
                         : String(r['Reason for Addition of Class'] || '');
 
                     return (
-                        <div key={i} className="card class-card" style={{ animationDelay: `${i * 30}ms` }}>
+                        <div
+                            key={rid || i}
+                            className="card class-card"
+                            style={{
+                                animationDelay: `${i * 30}ms`,
+                                borderLeft: selectedIds.has(rid) ? '3px solid var(--danger, #ef4444)' : '3px solid transparent',
+                                transition: 'border-left 0.15s ease',
+                            }}
+                        >
                             <div className="card-header">
-                                <div>
-                                    <h3 style={{ fontSize: '1rem', fontWeight: 600 }}>
-                                        {r['Class Title'] || 'Untitled'}
-                                    </h3>
-                                    <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-                                        {r['Instructor Name']} ({r['Instructor Email']})
-                                    </span>
+                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedIds.has(rid)}
+                                        onChange={() => toggleSelect(rid)}
+                                        style={{
+                                            width: '16px',
+                                            height: '16px',
+                                            marginTop: '3px',
+                                            accentColor: 'var(--primary, #4f46e5)',
+                                            cursor: 'pointer',
+                                            flexShrink: 0,
+                                        }}
+                                    />
+                                    <div>
+                                        <h3 style={{ fontSize: '1rem', fontWeight: 600 }}>
+                                            {r['Class Title'] || 'Untitled'}
+                                        </h3>
+                                        <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+                                            {r['Instructor Name']} ({r['Instructor Email']})
+                                        </span>
+                                    </div>
                                 </div>
                                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                                     <span className={`badge badge-${r.request_type}`}>
@@ -253,7 +352,7 @@ const AdminDashboard: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* Rejection reason (shown when Rejected is selected) */}
+                        {/* Rejection reason */}
                         {statusVal === 'Rejected' && (
                             <div className="form-group">
                                 <label className="form-label">Reason for Rejection</label>
@@ -267,7 +366,7 @@ const AdminDashboard: React.FC = () => {
                             </div>
                         )}
 
-                        {/* ── Unavailability-specific fields (on Approve) ── */}
+                        {/* Unavailability-specific fields (on Approve) */}
                         {statusVal === 'Approved' && selectedRequest.request_type === 'unavailability' && (
                             <>
                                 <div className="form-group">
@@ -308,7 +407,7 @@ const AdminDashboard: React.FC = () => {
                             </>
                         )}
 
-                        {/* ── Class Addition-specific fields (on Approve) ── */}
+                        {/* Class Addition-specific fields (on Approve) */}
                         {statusVal === 'Approved' && selectedRequest.request_type === 'class_addition' && (
                             <>
                                 <div className="form-group">

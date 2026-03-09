@@ -1,13 +1,16 @@
-"""Admin endpoints — view requests, approve/reject."""
+"""Admin endpoints — view requests, approve/reject, delete."""
 
 import asyncio
+import logging
 from datetime import datetime
+from typing import List
+
+from pydantic import BaseModel
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.dependencies import require_admin
 from app.models import UserInfo, StatusUpdateRequest
-from app.cache import cache
 from app.supabase_client import supabase
 from app.sheets import (
     sheets_service,
@@ -62,9 +65,14 @@ async def get_all_requests(
                 r["Status"] = r.get("status")
                 r["Original Date of Class (MM/DD/YYYY)"] = r.get("original_date_of_class")
                 r["Date of Class (MM/DD/YYYY)"] = r.get("original_date_of_class")
+                r["Original Time of Class (HH:MM AM/PM) IST"] = r.get("original_time_of_class")
                 r["Batch Name"] = r.get("batch_name")
                 r["Instructor Name"] = r.get("instructor_name")
+                r["Instructor Email"] = r.get("instructor_email")
                 r["Class Title"] = r.get("class_title")
+                r["Program"] = r.get("program")
+                r["Class Type"] = r.get("class_type")
+                r["Reason for Unavailability"] = r.get("reason_for_unavailability")
                 results.append({**r, "request_type": "unavailability"})
 
         if request_type in ("all", "class_addition"):
@@ -76,9 +84,14 @@ async def get_all_requests(
                 r["Request ID"] = r.get("id")
                 r["Status"] = r.get("status")
                 r["Date of Class (MM/DD/YYYY)"] = r.get("date_of_class")
+                r["Time of Class (HH:MM AM/PM) IST"] = r.get("time_of_class")
                 r["Batch Name"] = r.get("batch_name")
                 r["Instructor Name"] = r.get("instructor_name")
+                r["Instructor Email"] = r.get("instructor_email")
                 r["Class Title"] = r.get("class_title")
+                r["Program"] = r.get("program")
+                r["Class Type"] = r.get("class_type")
+                r["Reason for Addition of Class"] = r.get("reason_for_addition")
                 results.append({**r, "request_type": "class_addition"})
                 
     except Exception as e:
@@ -165,3 +178,55 @@ async def update_request_status(
     )
 
     return {"message": f"Request {body.status.value.lower()} successfully."}
+
+
+logger = logging.getLogger(__name__)
+
+
+class BulkDeleteRequest(BaseModel):
+    request_ids: List[str]
+
+
+@router.post("/requests/delete")
+async def delete_requests(
+    body: BulkDeleteRequest,
+    admin: UserInfo = Depends(require_admin),
+):
+    """Bulk delete requests from Supabase and Google Sheets."""
+    if not body.request_ids:
+        raise HTTPException(status_code=400, detail="No request IDs provided.")
+
+    deleted_count = 0
+    errors = []
+
+    for rid in body.request_ids:
+        record, req_type = _find_request(rid)
+        if not record:
+            errors.append(f"{rid}: not found")
+            continue
+
+        table = "unavailability_requests" if req_type == "unavailability" else "class_addition_requests"
+        sheet = UNAVAILABILITY_SHEET if req_type == "unavailability" else CLASS_ADDITION_SHEET
+
+        # 1. Delete from Supabase
+        try:
+            supabase.table(table).delete().eq("id", rid).execute()
+        except Exception as e:
+            errors.append(f"{rid}: Supabase delete failed ({e})")
+            continue
+
+        # 2. Delete from Google Sheet (best-effort, col 1 = Request ID)
+        try:
+            row_num = sheets_service.find_row_by_value(sheet, 1, rid)
+            if row_num:
+                sheets_service.delete_row(sheet, row_num)
+        except Exception as e:
+            logger.warning(f"Sheet delete for {rid} failed (non-fatal): {e}")
+
+        deleted_count += 1
+
+    return {
+        "message": f"{deleted_count} request(s) deleted.",
+        "deleted": deleted_count,
+        "errors": errors,
+    }
