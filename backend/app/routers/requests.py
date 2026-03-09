@@ -122,21 +122,6 @@ async def create_unavailability_request(
         class_title = cls.get('class_title', cls.get('class_topic', ''))
         class_type  = cls.get('class_type', '')
 
-        # Look up Slack user ID for suggested replacement from Supabase
-        def get_slack_id(name: str) -> str:
-            if not name:
-                return ""
-            try:
-                res = supabase.table("slack_members").select("id").ilike("name", name.strip()).limit(1).execute()
-                if res.data:
-                    return str(res.data[0].get("id", "")).strip()
-            except Exception as e:
-                print(f"[ERROR] Slack member lookup failed: {e}")
-            return ""
-
-        slack_id = get_slack_id(body.suggested_replacement or "")
-        print(f"[DEBUG] Suggested replacement: name='{body.suggested_replacement}' -> slack_id='{slack_id}'")
-
         workflow_data = {
             "instructor_email":      user.email,
             "instructor_name":       user.name,
@@ -150,7 +135,7 @@ async def create_unavailability_request(
             "class_type":            class_type,
             "reason":                body.reason,
             "other_comments":        body.other_comments or "",
-            "suggested_replacement": slack_id,
+            "suggested_replacement": body.suggested_replacement or "",
             "topics_and_promises":   body.topics_and_promises,
             "batch_pulse_persona":   body.batch_pulse_persona,
             "teaching_pace_style":   body.teaching_pace_style,
