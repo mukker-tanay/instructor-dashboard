@@ -102,20 +102,26 @@ async def auth_callback(request: Request, code: str):
     role = resolve_role(email)
 
     # ---------------------------------------------------------
-    # INSTRUCTOR ACCESS CONTROL
+    # INSTRUCTOR ACCESS & ALIAS RESOLUTION
     # ---------------------------------------------------------
-    if role != "admin":
-        try:
-            # Check if this email has been explicitly granted access
-            res = supabase.table("allowed_instructors").select("email").eq("email", email.lower()).execute()
-            if not res.data:
+    try:
+        # Check if this email is explicitly in the allowed list
+        res = supabase.table("allowed_instructors").select("email, alias_email").eq("email", email.lower()).execute()
+        
+        if res.data:
+            # If they have an alias defined, map their primary email to it
+            alias = res.data[0].get("alias_email")
+            if alias:
+                email = alias.strip().lower()
+        else:
+            # If not in the allowed list, reject them UNLESS they are an admin
+            if role != "admin":
                 logger.warning(f"Blocked unauthorized login attempt from: {email}")
-                # Redirect to frontend root with an error query param
                 redirect_target = f"{settings.frontend_url.rstrip('/')}/?error=unauthorized"
                 return RedirectResponse(url=redirect_target)
-        except Exception as e:
-            logger.error(f"Failed to verify instructor access for {email}: {e}")
-            raise HTTPException(status_code=500, detail="Error verifying access permissions")
+    except Exception as e:
+        logger.error(f"Failed to verify instructor access for {email}: {e}")
+        raise HTTPException(status_code=500, detail="Error verifying access permissions")
     # ---------------------------------------------------------
 
     user = UserInfo(

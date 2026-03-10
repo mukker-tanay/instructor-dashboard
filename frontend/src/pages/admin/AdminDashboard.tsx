@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getAdminRequests, updateRequestStatus, getInstructorOptions, deleteRequests, getAllowedInstructors, addAllowedInstructor, removeAllowedInstructor } from '../../api/client';
+import { getAdminRequests, updateRequestStatus, getInstructorOptions, deleteRequests, getAllowedInstructors, addAllowedInstructor, removeAllowedInstructor, updateAllowedInstructorAlias } from '../../api/client';
 import type { RequestItem, StatusUpdate } from '../../types';
 import Modal from '../../components/Modal';
 
@@ -15,9 +15,14 @@ const AdminDashboard: React.FC = () => {
     const [activeView, setActiveView] = useState<'requests' | 'access'>('requests');
 
     // Access Control state
-    const [instructors, setInstructors] = useState<{ email: string; added_by?: string; added_at?: string }[]>([]);
+    const [instructors, setInstructors] = useState<{ email: string; added_by?: string; added_at?: string; alias_email?: string }[]>([]);
     const [newInstructorEmail, setNewInstructorEmail] = useState('');
+    const [instructorSearch, setInstructorSearch] = useState('');
     const [accessLoading, setAccessLoading] = useState(false);
+
+    // Alias Modal State
+    const [aliasModalEmail, setAliasModalEmail] = useState<string | null>(null);
+    const [aliasModalValue, setAliasModalValue] = useState('');
 
     // Selection state for bulk delete
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -103,6 +108,26 @@ const AdminDashboard: React.FC = () => {
             alert(err.response?.data?.detail || 'Failed to remove instructor');
         }
     };
+
+    const handleUpdateAlias = async () => {
+        if (!aliasModalEmail) return;
+        try {
+            setSubmitting(true);
+            await updateAllowedInstructorAlias(aliasModalEmail, aliasModalValue);
+            setAliasModalEmail(null);
+            setAliasModalValue('');
+            fetchInstructors();
+        } catch (err: any) {
+            alert(err.response?.data?.detail || 'Failed to update alias');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const filteredInstructors = instructors.filter(i =>
+        i.email.toLowerCase().includes(instructorSearch.toLowerCase()) ||
+        (i.alias_email && i.alias_email.toLowerCase().includes(instructorSearch.toLowerCase()))
+    );
 
     // --- Selection helpers ---
     const getRequestId = (r: RequestItem): string =>
@@ -553,8 +578,16 @@ const AdminDashboard: React.FC = () => {
                     </div>
 
                     <div className="card">
-                        <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)' }}>
-                            <h3 style={{ fontSize: '1rem', fontWeight: 600, margin: 0 }}>Allowed Instructors ({instructors.length})</h3>
+                        <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h3 style={{ fontSize: '1rem', fontWeight: 600, margin: 0 }}>Allowed Instructors ({filteredInstructors.length})</h3>
+                            <input
+                                type="text"
+                                className="form-input"
+                                placeholder="Search emails..."
+                                value={instructorSearch}
+                                onChange={e => setInstructorSearch(e.target.value)}
+                                style={{ width: '250px', padding: '6px 12px', fontSize: '0.875rem' }}
+                            />
                         </div>
                         {accessLoading ? (
                             <div className="loading-container"><div className="spinner" /></div>
@@ -562,32 +595,55 @@ const AdminDashboard: React.FC = () => {
                             <div className="empty-state" style={{ padding: '40px' }}>
                                 <p className="empty-state-text">No instructors have been explicitly allowed yet.</p>
                             </div>
+                        ) : filteredInstructors.length === 0 ? (
+                            <div className="empty-state" style={{ padding: '40px' }}>
+                                <p className="empty-state-text">No instructors matching "{instructorSearch}".</p>
+                            </div>
                         ) : (
                             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>
                                 <thead>
                                     <tr style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)' }}>
                                         <th style={{ padding: '12px 24px', fontWeight: 500, color: 'var(--text-muted)' }}>Email</th>
-                                        <th style={{ padding: '12px 24px', fontWeight: 500, color: 'var(--text-muted)' }}>Granted By</th>
-                                        <th style={{ padding: '12px 24px', fontWeight: 500, color: 'var(--text-muted)' }}>Granted Date</th>
+                                        <th style={{ padding: '12px 24px', fontWeight: 500, color: 'var(--text-muted)' }}>Alias / Primary Email</th>
                                         <th style={{ padding: '12px 24px', fontWeight: 500, color: 'var(--text-muted)', textAlign: 'right' }}>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {instructors.map(inst => (
+                                    {filteredInstructors.map(inst => (
                                         <tr key={inst.email} style={{ borderBottom: '1px solid var(--border)' }}>
-                                            <td style={{ padding: '16px 24px', fontWeight: 500 }}>{inst.email}</td>
-                                            <td style={{ padding: '16px 24px', color: 'var(--text-muted)' }}>{inst.added_by || 'System'}</td>
+                                            <td style={{ padding: '16px 24px', fontWeight: 500 }}>
+                                                {inst.email}
+                                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                                    Added {inst.added_at ? new Date(inst.added_at).toLocaleDateString() : '—'} by {inst.added_by || 'System'}
+                                                </div>
+                                            </td>
                                             <td style={{ padding: '16px 24px', color: 'var(--text-muted)' }}>
-                                                {inst.added_at ? new Date(inst.added_at).toLocaleDateString() : '—'}
+                                                {inst.alias_email ? (
+                                                    <span style={{ fontWeight: 500, color: 'var(--text)' }}>{inst.alias_email}</span>
+                                                ) : (
+                                                    <span style={{ fontStyle: 'italic', opacity: 0.7 }}>None</span>
+                                                )}
                                             </td>
                                             <td style={{ padding: '16px 24px', textAlign: 'right' }}>
-                                                <button
-                                                    className="btn btn-danger btn-sm"
-                                                    onClick={() => handleRemoveInstructor(inst.email)}
-                                                    style={{ padding: '4px 12px', fontSize: '0.75rem' }}
-                                                >
-                                                    Revoke
-                                                </button>
+                                                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                                    <button
+                                                        className="btn btn-secondary btn-sm"
+                                                        onClick={() => {
+                                                            setAliasModalEmail(inst.email);
+                                                            setAliasModalValue(inst.alias_email || '');
+                                                        }}
+                                                        style={{ padding: '4px 12px', fontSize: '0.75rem' }}
+                                                    >
+                                                        {inst.alias_email ? 'Edit Alias' : 'Add Alias'}
+                                                    </button>
+                                                    <button
+                                                        className="btn btn-danger btn-sm"
+                                                        onClick={() => handleRemoveInstructor(inst.email)}
+                                                        style={{ padding: '4px 12px', fontSize: '0.75rem' }}
+                                                    >
+                                                        Revoke
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
@@ -597,6 +653,40 @@ const AdminDashboard: React.FC = () => {
                     </div>
                 </div>
             )}
+
+            {/* Alias Modal */}
+            <Modal
+                isOpen={!!aliasModalEmail}
+                onClose={() => setAliasModalEmail(null)}
+                title="Update Email Alias"
+            >
+                {aliasModalEmail && (
+                    <>
+                        <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
+                            If <strong>{aliasModalEmail}</strong> has classes assigned to a different primary email, enter it here. This will automatically redirect their dashboard to show the primary email's classes.
+                        </p>
+                        <div className="form-group">
+                            <label className="form-label">Primary Email (Alias Target)</label>
+                            <input
+                                type="email"
+                                className="form-input"
+                                placeholder="primary.email@scaler.com"
+                                value={aliasModalValue}
+                                onChange={e => setAliasModalValue(e.target.value)}
+                            />
+                            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '6px' }}>
+                                Leave blank to clear an existing alias.
+                            </p>
+                        </div>
+                        <div className="modal-actions">
+                            <button className="btn btn-secondary" onClick={() => setAliasModalEmail(null)}>Cancel</button>
+                            <button className="btn btn-primary" onClick={handleUpdateAlias} disabled={submitting}>
+                                {submitting ? 'Saving...' : 'Save Alias'}
+                            </button>
+                        </div>
+                    </>
+                )}
+            </Modal>
         </div>
     );
 };

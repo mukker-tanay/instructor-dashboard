@@ -72,8 +72,11 @@ export const getAllowedInstructors = () =>
 export const addAllowedInstructor = (emails: string[]) =>
     api.post<{ message: string }>('/admin/instructors', { emails }).then(r => r.data);
 
+export const updateAllowedInstructorAlias = (email: string, alias_email: string) =>
+    api.post<{ message: string }>('/admin/instructors/alias', { email, alias_email }).then(r => r.data);
+
 export const removeAllowedInstructor = (email: string) =>
-    api.delete<{ message: string }>(`/admin/instructors/${email}`).then(r => r.data);
+    api.delete<{ message: string }>(`/admin/instructors?email=${encodeURIComponent(email)}`).then(r => r.data);
 
 /* ── Health ── */
 export const healthCheck = () => api.get('/health').then(r => r.data);

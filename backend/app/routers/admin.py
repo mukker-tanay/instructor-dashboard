@@ -229,6 +229,10 @@ async def delete_requests(
 class AllowedInstructorCreate(BaseModel):
     emails: List[str]
 
+class AllowedInstructorAliasUpdate(BaseModel):
+    email: str
+    alias_email: str | None = None
+
 
 @router.get("/instructors")
 async def get_allowed_instructors(admin: UserInfo = Depends(require_admin)):
@@ -262,7 +266,24 @@ async def add_allowed_instructor(
         raise HTTPException(status_code=500, detail="Failed to add instructors")
 
 
-@router.delete("/instructors/{email}")
+@router.post("/instructors/alias")
+async def update_allowed_instructor_alias(
+    body: AllowedInstructorAliasUpdate,
+    admin: UserInfo = Depends(require_admin)
+):
+    """Set or clear an alias email for an allowed instructor."""
+    email = body.email.strip().lower()
+    alias = body.alias_email.strip().lower() if body.alias_email else None
+    
+    try:
+        supabase.table("allowed_instructors").update({"alias_email": alias}).eq("email", email).execute()
+        return {"message": f"Alias updated for {email}"}
+    except Exception as e:
+        logger.error(f"Failed to update alias for {email}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update alias")
+
+
+@router.delete("/instructors")
 async def remove_allowed_instructor(
     email: str,
     admin: UserInfo = Depends(require_admin)
