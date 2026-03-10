@@ -1,0 +1,2 @@
+Record in DB: {'email': 'shubham.yadav02@scaler.com', 'alias_email': 'shubham.yadav@scaler.com'}
+Final Token Sub: shubham.yadav@scaler.com
