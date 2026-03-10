@@ -180,8 +180,20 @@ async def impersonate(request: Request):
     if not target_email:
         raise HTTPException(status_code=400, detail="Email is required")
 
-    # Look up the real name from class data
     from app.supabase_client import supabase
+    
+    # --- ALIAS RESOLUTION FOR IMPERSONATION ---
+    try:
+        res = supabase.table("allowed_instructors").select("email, alias_email").eq("email", target_email.lower()).execute()
+        if res.data:
+            alias = res.data[0].get("alias_email")
+            if alias:
+                target_email = alias.strip().lower()
+    except Exception as e:
+        logger.error(f"Failed to check alias during impersonation for {target_email}: {e}")
+    # ------------------------------------------
+
+    # Look up the real name from class data
     real_name = target_email.split("@")[0]  # fallback
     try:
         res = supabase.table("classes").select("instructor_name").eq("instructor_email", target_email.lower()).limit(1).execute()
