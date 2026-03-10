@@ -66,6 +66,15 @@ export const updateRequestStatus = (requestId: string, data: StatusUpdate) =>
 export const deleteRequests = (requestIds: string[]) =>
     api.post<{ message: string; deleted: number; errors: string[] }>('/admin/requests/delete', { request_ids: requestIds }).then(r => r.data);
 
+export const getAllowedInstructors = () =>
+    api.get<{ instructors: { email: string; added_by?: string; added_at?: string }[] }>('/admin/instructors').then(r => r.data);
+
+export const addAllowedInstructor = (emails: string[]) =>
+    api.post<{ message: string }>('/admin/instructors', { emails }).then(r => r.data);
+
+export const removeAllowedInstructor = (email: string) =>
+    api.delete<{ message: string }>(`/admin/instructors/${email}`).then(r => r.data);
+
 /* ── Health ── */
 export const healthCheck = () => api.get('/health').then(r => r.data);
 

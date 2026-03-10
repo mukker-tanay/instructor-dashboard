@@ -11,6 +11,7 @@ from jose import jwt, JWTError
 
 from app.config import settings
 from app.models import UserInfo
+from app.supabase_client import supabase
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -98,11 +99,30 @@ async def auth_callback(request: Request, code: str):
         userinfo = userinfo_resp.json()
 
     email = userinfo.get("email", "")
+    role = resolve_role(email)
+
+    # ---------------------------------------------------------
+    # INSTRUCTOR ACCESS CONTROL
+    # ---------------------------------------------------------
+    if role != "admin":
+        try:
+            # Check if this email has been explicitly granted access
+            res = supabase.table("allowed_instructors").select("email").eq("email", email.lower()).execute()
+            if not res.data:
+                logger.warning(f"Blocked unauthorized login attempt from: {email}")
+                # Redirect to frontend root with an error query param
+                redirect_target = f"{settings.frontend_url.rstrip('/')}/?error=unauthorized"
+                return RedirectResponse(url=redirect_target)
+        except Exception as e:
+            logger.error(f"Failed to verify instructor access for {email}: {e}")
+            raise HTTPException(status_code=500, detail="Error verifying access permissions")
+    # ---------------------------------------------------------
+
     user = UserInfo(
         email=email,
         name=userinfo.get("name", ""),
         picture=userinfo.get("picture", ""),
-        role=resolve_role(email),
+        role=role,
     )
 
     token = create_jwt(user)

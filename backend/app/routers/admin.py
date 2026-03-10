@@ -220,3 +220,57 @@ async def delete_requests(
         "deleted": deleted_count,
         "errors": errors,
     }
+
+
+# -------------------------------------------------------------------
+# INSTRUCTOR ACCESS CONTROL
+# -------------------------------------------------------------------
+
+class AllowedInstructorCreate(BaseModel):
+    emails: List[str]
+
+
+@router.get("/instructors")
+async def get_allowed_instructors(admin: UserInfo = Depends(require_admin)):
+    """Get all explicitly allowed instructors."""
+    try:
+        res = supabase.table("allowed_instructors").select("*").order("added_at", desc=True).execute()
+        return {"instructors": res.data or []}
+    except Exception as e:
+        logger.error(f"Failed to fetch allowed instructors: {e}")
+        raise HTTPException(status_code=500, detail="Database lookup failed")
+
+
+@router.post("/instructors")
+async def add_allowed_instructor(
+    body: AllowedInstructorCreate,
+    admin: UserInfo = Depends(require_admin)
+):
+    """Grant instructors access to the dashboard."""
+    valid_emails = [e.strip().lower() for e in body.emails if e.strip()]
+    
+    if not valid_emails:
+        raise HTTPException(status_code=400, detail="Valid emails are required")
+
+    try:
+        # We use an upsert just in case it already exists so it doesn't fail fatally
+        payload = [{"email": email, "added_by": admin.email} for email in valid_emails]
+        supabase.table("allowed_instructors").upsert(payload, on_conflict="email").execute()
+        return {"message": f"Successfully granted access to {len(valid_emails)} instructor(s)"}
+    except Exception as e:
+        logger.error(f"Failed to add allowed instructors {valid_emails}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to add instructors")
+
+
+@router.delete("/instructors/{email}")
+async def remove_allowed_instructor(
+    email: str,
+    admin: UserInfo = Depends(require_admin)
+):
+    """Revoke an instructor's access from the dashboard."""
+    try:
+        supabase.table("allowed_instructors").delete().eq("email", email.lower()).execute()
+        return {"message": f"Successfully revoked access for {email}"}
+    except Exception as e:
+        logger.error(f"Failed to remove allowed instructor {email}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to remove instructor")
