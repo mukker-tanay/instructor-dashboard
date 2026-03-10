@@ -20,8 +20,8 @@ def mock_login(email):
 
 try:
     sub, record = mock_login("shubham.yadav02@scaler.com")
-    with open('yadav.txt', 'w', encoding='utf-8') as f:
+    with open('alias.txt', 'w', encoding='utf-8') as f:
         f.write(f"Record in DB: {record}\nFinal Token Sub: {sub}")
 except Exception as e:
-    with open('yadav.txt', 'w', encoding='utf-8') as f:
+    with open('alias.txt', 'w', encoding='utf-8') as f:
         f.write(f"ERROR: {e}")

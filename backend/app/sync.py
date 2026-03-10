@@ -105,7 +105,46 @@ async def pull_classes():
             logger.error(f"Failed to upsert classes chunk: {e}")
             
     # Optional: Delete rows in Supabase that no longer exist in Google Sheets
-    # (Leaving this out for safety unless strictly required, to prevent accidental mass deletion)
+    if not active_hashes:
+        logger.warning("No active hashes found (sheets might be empty or failed to load). Skipping deletion to prevent accidental mass deletion.")
+    else:
+        logger.info("Checking for deleted classes to remove from Supabase...")
+        try:
+            # Pagination to fetch all existing hashes from Supabase
+            all_supabase_classes = []
+            page_size = 1000
+            offset = 0
+            while True:
+                # We specifically fetch id and sheet_row_hash for classes.
+                # All classes in this table are synced from Google Sheets.
+                res = supabase.table("classes").select("id, sheet_row_hash").range(offset, offset + page_size - 1).execute()
+                data = res.data or []
+                all_supabase_classes.extend(data)
+                
+                if len(data) < page_size:
+                    break
+                offset += page_size
+
+            # Identify orphaned classes
+            ids_to_delete = []
+            for row in all_supabase_classes:
+                if row.get("sheet_row_hash") not in active_hashes:
+                    ids_to_delete.append(row["id"])
+
+            if ids_to_delete:
+                logger.info(f"Found {len(ids_to_delete)} orphaned classes in Supabase. Deleting...")
+                for i in range(0, len(ids_to_delete), chunk_size):
+                    chunk_ids = ids_to_delete[i:i + chunk_size]
+                    try:
+                        supabase.table("classes").delete().in_("id", chunk_ids).execute()
+                        logger.info(f"Deleted orphaned classes chunk {i} to {i+len(chunk_ids)}")
+                    except Exception as e:
+                        logger.error(f"Failed to delete orphaned classes chunk: {e}")
+            else:
+                logger.info("No orphaned classes found to delete.")
+
+        except Exception as e:
+            logger.error(f"Failed to fetch classes for deletion check: {e}")
 
 
 async def pull_slack_data():
