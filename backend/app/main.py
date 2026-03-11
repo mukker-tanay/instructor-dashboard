@@ -10,7 +10,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from app.config import settings
 from app.sheets import sheets_service
 from app.cache import cache
-from app.sync import run_full_sync
+from app.sync import run_full_sync, get_sync_status
 from app.auth import router as auth_router
 from app.routers.classes import router as classes_router
 from app.routers.requests import router as requests_router
@@ -84,3 +84,9 @@ async def trigger_sync():
     except Exception as e:
         logger.error(f"Manual Sync Failed: {e}")
         return {"status": "error", "message": str(e)}
+
+@app.get("/api/sync/status")
+async def sync_status():
+    """Check when the last manual or cron sync occurred."""
+    return await get_sync_status()
+

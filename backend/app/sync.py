@@ -318,6 +318,18 @@ async def sync_deletions():
             logger.error(f"Deletion sync failed for '{sheet}': {e}")
 
 
+async def get_sync_status():
+    """Returns the timestamp of the last successful sync from the classes table."""
+    try:
+        res = supabase.table("classes").select("synced_at").order("synced_at", desc=True).limit(1).execute()
+        if res.data and len(res.data) > 0:
+            return {"status": "ok", "last_successful_sync": res.data[0].get("synced_at")}
+        return {"status": "ok", "last_successful_sync": "Never (or table empty)"}
+    except Exception as e:
+        logger.error(f"Failed to fetch sync status: {e}")
+        return {"status": "error", "message": str(e)}
+
+
 async def run_full_sync():
     """Runs the complete Sync Engine combining Pulls and Pushes securely."""
     logger.info("--- SYNC ENGINE STARTED ---")

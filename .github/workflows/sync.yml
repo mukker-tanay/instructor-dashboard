@@ -1,0 +1,19 @@
+name: Hourly Sync API Trigger
+
+on:
+  schedule:
+    # Runs every 30 minutes
+    - cron: '*/30 * * * *'
+  workflow_dispatch: # Allows manual triggering from GitHub UI
+
+jobs:
+  trigger-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call Sync API
+        run: |
+          curl -X GET "https://instructor-dashboard-six.vercel.app/api/sync" \
+          --max-time 600 \
+          --fail \
+          --silent \
+          --show-error
