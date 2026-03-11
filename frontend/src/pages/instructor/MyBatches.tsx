@@ -160,7 +160,11 @@ const BatchAccordionItem: React.FC<BatchAccordionItemProps> = ({
                         const modKey = `${batchName}::${modName}`;
                         const classes = batch.modules[modName];
                         const modExpanded = expandedModules.has(modKey);
-                        const riCount = classes.filter(c => c.is_replacement).length;
+                        const uniqueRIs = new Set(
+                            classes.filter(c => c.is_replacement)
+                                .map(c => c['instructor_email'] || c['instructor_name'] || 'Unknown')
+                        );
+                        const riCount = uniqueRIs.size;
 
                         return (
                             <div key={modKey} className="module-section">

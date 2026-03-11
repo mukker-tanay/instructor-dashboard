@@ -223,8 +223,10 @@ async def get_my_batches(user: UserInfo = Depends(get_current_user)):
         print(f"[ERROR] my-batches supabase error (step 2): {e}")
         all_classes_for_batches = []
 
-    # Step 3: Group by batch -> module and sort
-    my_groups: dict = defaultdict(lambda: defaultdict(list))
+    from collections import Counter
+
+    # Step 3: Group all qualifying classes by batch -> module
+    raw_groups: dict = defaultdict(lambda: defaultdict(list))
     
     for c in all_classes_for_batches:
         batch = str(c.get("sb_names", "")).strip()
@@ -232,28 +234,45 @@ async def get_my_batches(user: UserInfo = Depends(get_current_user)):
         if not batch or not module:
             continue
         
-        # Only process if in our qualifying list
         if batch in qualifying_batches:
-            entry = {k: v for k, v in c.items() if not k.startswith("_")}
-            # Mark classes taken by someone else
-            entry["is_replacement"] = (str(c.get("instructor_email", "")).strip().lower() != email)
-            my_groups[batch][module].append(entry)
+            raw_groups[batch][module].append(c)
 
-    # Sort classes within each module by date
-    for batch in my_groups:
-        for module in my_groups[batch]:
-            my_groups[batch][module].sort(
+    # Step 4: Filter modules where the current instructor is the majority instructor
+    my_groups: dict = defaultdict(lambda: defaultdict(list))
+    for batch, modules in raw_groups.items():
+        for module, classes in modules.items():
+            # Find majority instructor for the module
+            counts = Counter()
+            for c in classes:
+                instr = str(c.get("instructor_email", "")).strip().lower()
+                counts[instr] += 1
+            
+            majority_email, _ = counts.most_common(1)[0]
+            if majority_email != email:
+                continue
+            
+            cleaned = []
+            for c in classes:
+                entry = {k: v for k, v in c.items() if not k.startswith("_")}
+                # Mark classes taken by someone else
+                entry["is_replacement"] = (str(c.get("instructor_email", "")).strip().lower() != email)
+                cleaned.append(entry)
+            
+            cleaned.sort(
                 key=lambda c: parse_datetime(
                     str(c.get("class_date", "")),
                     str(c.get("time_of_day", "")),
                 )
             )
+            my_groups[batch][module] = cleaned
 
-    # Step 4: Build response
+    # Step 5: Build response
     result = {}
     for batch in sorted(my_groups.keys()):
         modules = my_groups[batch]
-        # Try to get program from any class in this batch
+        if not modules:
+            continue
+            
         program = ""
         for mod_classes in modules.values():
             if mod_classes:
