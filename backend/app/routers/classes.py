@@ -186,71 +186,70 @@ async def get_batch_metadata(user: UserInfo = Depends(get_current_user)):
 
 @router.get("/my-batches")
 async def get_my_batches(user: UserInfo = Depends(get_current_user)):
-    """Return batches from upcoming classes where this instructor is the majority
-    instructor, grouped by batch → module. Includes RI-taken classes."""
-    from collections import Counter, defaultdict
+    """Return batches where the instructor has taken > 5 classes in total 
+    (past + upcoming). For those batches, return all classes grouped by 
+    batch → module, including those taken by other instructors (RI)."""
+    from collections import defaultdict
 
     email = user.email.lower()
-    now = datetime.now(IST)
 
-    # Step 1: group UPCOMING classes by (batch, module) → list of classes
-    groups: dict = defaultdict(list)
+    # Step 1: Find all batches where this instructor has > 5 classes (past or upcoming)
     try:
-        resp = supabase.table("classes").select("*").eq("class_category", "upcoming").execute()
-        all_upcoming = resp.data or []
+        # We only need sb_names to count
+        resp = supabase.table("classes").select("sb_names").eq("instructor_email", email).execute()
+        my_classes = resp.data or []
     except Exception as e:
-        print(f"[ERROR] my-batches supabase error: {e}")
-        all_upcoming = []
+        print(f"[ERROR] my-batches supabase error (step 1): {e}")
+        my_classes = []
 
-    for c in all_upcoming:
-        # Only include upcoming classes
-        parsed_dt = parse_datetime(
-            str(c.get("class_date", "")),
-            str(c.get("time_of_day", "")),
-        )
-        if parsed_dt < now:
-            continue
+    batch_counts = defaultdict(int)
+    for c in my_classes:
+        b = str(c.get("sb_names", "")).strip()
+        if b:
+            batch_counts[b] += 1
+
+    qualifying_batches = [b for b, count in batch_counts.items() if count > 5]
+
+    if not qualifying_batches:
+        return {"batches": {}}
+
+    # Step 2: Fetch ALL classes for these qualifying batches
+    all_classes_for_batches = []
+    
+    try:
+        resp2 = supabase.table("classes").select("*").in_("sb_names", qualifying_batches).execute()
+        all_classes_for_batches = resp2.data or []
+    except Exception as e:
+        print(f"[ERROR] my-batches supabase error (step 2): {e}")
+        all_classes_for_batches = []
+
+    # Step 3: Group by batch -> module and sort
+    my_groups: dict = defaultdict(lambda: defaultdict(list))
+    
+    for c in all_classes_for_batches:
         batch = str(c.get("sb_names", "")).strip()
         module = str(c.get("module_name", "")).strip()
-        if batch and module:
-            groups[(batch, module)].append(c)
-
-    # Step 2: For each group, find the majority instructor.
-    # Keep the group only if the current user is the majority instructor.
-    my_groups: dict = defaultdict(lambda: defaultdict(list))
-    for (batch, module), classes in groups.items():
-        # Count how many classes each instructor teaches in this group
-        instructor_counts: Counter = Counter()
-        for c in classes:
-            instr = str(c.get("instructor_email", "")).strip().lower()
-            instructor_counts[instr] += 1
-
-        # Majority instructor = whoever has the most classes
-        majority_email, _ = instructor_counts.most_common(1)[0]
-        if majority_email != email:
+        if not batch or not module:
             continue
-
-        # Sort classes by date within each module
-        sorted_classes = sorted(
-            classes,
-            key=lambda c: parse_datetime(
-                str(c.get("class_date", "")),
-                str(c.get("time_of_day", "")),
-            ),
-        )
-
-        # Strip internal fields and mark RI-taken classes
-        cleaned = []
-        for c in sorted_classes:
+        
+        # Only process if in our qualifying list
+        if batch in qualifying_batches:
             entry = {k: v for k, v in c.items() if not k.startswith("_")}
-            entry["is_replacement"] = (
-                str(c.get("instructor_email", "")).strip().lower() != email
+            # Mark classes taken by someone else
+            entry["is_replacement"] = (str(c.get("instructor_email", "")).strip().lower() != email)
+            my_groups[batch][module].append(entry)
+
+    # Sort classes within each module by date
+    for batch in my_groups:
+        for module in my_groups[batch]:
+            my_groups[batch][module].sort(
+                key=lambda c: parse_datetime(
+                    str(c.get("class_date", "")),
+                    str(c.get("time_of_day", "")),
+                )
             )
-            cleaned.append(entry)
 
-        my_groups[batch][module] = cleaned
-
-    # Step 3: Build response keyed by batch
+    # Step 4: Build response
     result = {}
     for batch in sorted(my_groups.keys()):
         modules = my_groups[batch]
