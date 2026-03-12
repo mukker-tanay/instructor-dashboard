@@ -25,7 +25,7 @@ async def send_workflow_payload(webhook_url: str, data: dict) -> None:
     clean_data = {k: (v if v else "None") for k, v in data.items()}
 
     logger.info(f"Slack Workflow payload keys: {list(clean_data.keys())}")
-    logger.debug(f"Slack Workflow payload: {clean_data}")
+    logger.info(f"Slack Workflow payload: {clean_data}")
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
