@@ -98,12 +98,12 @@ const PoliciesPage: React.FC = () => {
 
     return (
         <div className="page-container">
-            <div className="action-bar">
+            <div className="action-bar" style={{ flexWrap: 'wrap', gap: 'var(--space-sm)' }}>
                 <div className="page-header" style={{ marginBottom: 0 }}>
                     <h1 className="page-title">Policies</h1>
                     <p className="page-subtitle">Company policy documents and guidelines</p>
                 </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
                     <button className="btn btn-secondary btn-sm" onClick={load} disabled={loading} title="Refresh list">
                         {loading ? '…' : '↻ Refresh'}
                     </button>
@@ -225,7 +225,7 @@ const PoliciesPage: React.FC = () => {
             ) : (
                 <div style={{ display: 'grid', gap: 'var(--space-md)' }}>
                     {filtered.map(policy => (
-                        <div key={policy.row} className="card" style={{ padding: 'var(--space-md) var(--space-lg)', display: 'flex', alignItems: 'center', gap: 'var(--space-lg)' }}>
+                        <div key={policy.row} className="card" style={{ padding: 'var(--space-md) var(--space-lg)', display: 'flex', alignItems: 'flex-start', gap: 'var(--space-lg)', flexWrap: 'wrap' }}>
                             {/* File icon */}
                             <div style={{
                                 width: '40px', height: '48px', flexShrink: 0, borderRadius: '6px',
@@ -295,7 +295,7 @@ const PoliciesPage: React.FC = () => {
                         style={{ width: '92vw', maxWidth: '1100px', height: '90vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}
                     >
                         {/* Header */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '14px 20px', borderBottom: '1px solid var(--border)', flexShrink: 0, flexWrap: 'wrap', gap: '8px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
                                 <span style={{ fontWeight: 600, fontSize: '0.9375rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{viewingPolicy.name}</span>
                                 {viewingPolicy.category && (

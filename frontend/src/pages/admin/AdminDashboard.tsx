@@ -251,7 +251,7 @@ const AdminDashboard: React.FC = () => {
 
     return (
         <div className="page-container">
-            <div className="action-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="action-bar" style={{ flexWrap: 'wrap', gap: 'var(--space-sm)' }}>
                 <div className="page-header" style={{ marginBottom: 0 }}>
                     <h1 className="page-title">Admin Dashboard</h1>
                     <p className="page-subtitle">
@@ -260,7 +260,7 @@ const AdminDashboard: React.FC = () => {
                             : 'Manage Instructor Access'}
                     </p>
                 </div>
-                <div className="tabs" style={{ margin: 0 }}>
+                <div className="tabs" style={{ margin: 0, flexShrink: 0 }}>
                     <button className={`tab ${activeView === 'requests' ? 'active' : ''}`} onClick={() => setActiveView('requests')}>Requests</button>
                     <button className={`tab ${activeView === 'access' ? 'active' : ''}`} onClick={() => setActiveView('access')}>Access Control</button>
                 </div>
@@ -269,7 +269,7 @@ const AdminDashboard: React.FC = () => {
             {activeView === 'requests' ? (
                 <>
                     {/* Filters + Bulk Actions */}
-                    <div className="filters-bar">
+                    <div className="filters-bar" style={{ flexWrap: 'wrap', gap: 'var(--space-sm)' }}>
                         <div className="tabs" style={{ margin: 0 }}>
                             <button className={`tab ${filter === 'Pending' ? 'active' : ''}`} onClick={() => setFilter('Pending')}>Pending</button>
                             <button className={`tab ${filter === 'all' ? 'active' : ''}`} onClick={() => setFilter('all')}>All</button>
@@ -561,24 +561,24 @@ const AdminDashboard: React.FC = () => {
                         <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '16px' }}>
                             Only instructors added to this list can log in to the dashboard. Admins always have access.
                         </p>
-                        <form onSubmit={handleAddInstructor} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                        <form onSubmit={handleAddInstructor} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
                             <input
                                 type="text"
                                 className="form-input"
                                 placeholder="name1@scaler.com, name2@scaler.com..."
                                 value={newInstructorEmail}
                                 onChange={e => setNewInstructorEmail(e.target.value)}
-                                style={{ flex: 1, maxWidth: '400px' }}
+                                style={{ flex: '1 1 220px', minWidth: 0 }}
                                 required
                             />
-                            <button type="submit" className="btn btn-primary">
+                            <button type="submit" className="btn btn-primary" style={{ flexShrink: 0 }}>
                                 Give Access
                             </button>
                         </form>
                     </div>
 
                     <div className="card">
-                        <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                             <h3 style={{ fontSize: '1rem', fontWeight: 600, margin: 0 }}>Allowed Instructors ({filteredInstructors.length})</h3>
                             <input
                                 type="text"
@@ -586,7 +586,7 @@ const AdminDashboard: React.FC = () => {
                                 placeholder="Search emails..."
                                 value={instructorSearch}
                                 onChange={e => setInstructorSearch(e.target.value)}
-                                style={{ width: '250px', padding: '6px 12px', fontSize: '0.875rem' }}
+                                style={{ width: '220px', maxWidth: '100%', padding: '6px 12px', fontSize: '0.875rem' }}
                             />
                         </div>
                         {accessLoading ? (
@@ -600,55 +600,44 @@ const AdminDashboard: React.FC = () => {
                                 <p className="empty-state-text">No instructors matching "{instructorSearch}".</p>
                             </div>
                         ) : (
-                            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>
-                                <thead>
-                                    <tr style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)' }}>
-                                        <th style={{ padding: '12px 24px', fontWeight: 500, color: 'var(--text-muted)' }}>Email</th>
-                                        <th style={{ padding: '12px 24px', fontWeight: 500, color: 'var(--text-muted)' }}>Alias / Primary Email</th>
-                                        <th style={{ padding: '12px 24px', fontWeight: 500, color: 'var(--text-muted)', textAlign: 'right' }}>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {filteredInstructors.map(inst => (
-                                        <tr key={inst.email} style={{ borderBottom: '1px solid var(--border)' }}>
-                                            <td style={{ padding: '16px 24px', fontWeight: 500 }}>
-                                                {inst.email}
-                                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                                                    Added {inst.added_at ? new Date(inst.added_at).toLocaleDateString() : '—'} by {inst.added_by || 'System'}
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                {filteredInstructors.map(inst => (
+                                    <div key={inst.email} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', padding: '16px 24px', borderBottom: '1px solid var(--border)', fontSize: '0.875rem' }}>
+                                        <div style={{ minWidth: 0, flex: 1 }}>
+                                            <div style={{ fontWeight: 500, wordBreak: 'break-word' }}>{inst.email}</div>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                                Added {inst.added_at ? new Date(inst.added_at).toLocaleDateString() : '—'} by {inst.added_by || 'System'}
+                                            </div>
+                                            {inst.alias_email ? (
+                                                <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                                                    Alias: <span style={{ fontWeight: 500 }}>{inst.alias_email}</span>
                                                 </div>
-                                            </td>
-                                            <td style={{ padding: '16px 24px', color: 'var(--text-muted)' }}>
-                                                {inst.alias_email ? (
-                                                    <span style={{ fontWeight: 500, color: 'var(--text)' }}>{inst.alias_email}</span>
-                                                ) : (
-                                                    <span style={{ fontStyle: 'italic', opacity: 0.7 }}>None</span>
-                                                )}
-                                            </td>
-                                            <td style={{ padding: '16px 24px', textAlign: 'right' }}>
-                                                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                                                    <button
-                                                        className="btn btn-secondary btn-sm"
-                                                        onClick={() => {
-                                                            setAliasModalEmail(inst.email);
-                                                            setAliasModalValue(inst.alias_email || '');
-                                                        }}
-                                                        style={{ padding: '4px 12px', fontSize: '0.75rem' }}
-                                                    >
-                                                        {inst.alias_email ? 'Edit Alias' : 'Add Alias'}
-                                                    </button>
-                                                    <button
-                                                        className="btn btn-danger btn-sm"
-                                                        onClick={() => handleRemoveInstructor(inst.email)}
-                                                        style={{ padding: '4px 12px', fontSize: '0.75rem' }}
-                                                    >
-                                                        Revoke
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                            ) : (
+                                                <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '4px' }}>No alias</div>
+                                            )}
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                                            <button
+                                                className="btn btn-secondary btn-sm"
+                                                onClick={() => {
+                                                    setAliasModalEmail(inst.email);
+                                                    setAliasModalValue(inst.alias_email || '');
+                                                }}
+                                                style={{ padding: '4px 12px', fontSize: '0.75rem' }}
+                                            >
+                                                {inst.alias_email ? 'Edit Alias' : 'Add Alias'}
+                                            </button>
+                                            <button
+                                                className="btn btn-danger btn-sm"
+                                                onClick={() => handleRemoveInstructor(inst.email)}
+                                                style={{ padding: '4px 12px', fontSize: '0.75rem' }}
+                                            >
+                                                Revoke
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         )}
                     </div>
                 </div>
