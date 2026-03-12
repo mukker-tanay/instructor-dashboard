@@ -1053,7 +1053,7 @@ const InstructorDashboard: React.FC = () => {
                                 {upFilterDateRange ? (upFilterDateRange.start === upFilterDateRange.end ? upFilterDateRange.start : `${upFilterDateRange.start} – ${upFilterDateRange.end}`) : '📅 Date'}
                             </button>
                             {upShowCal && (
-                                <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 100, boxShadow: 'var(--shadow-lg)', borderRadius: 'var(--radius-md)' }}>
+                                <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, left: 'auto', zIndex: 100, boxShadow: 'var(--shadow-lg)', borderRadius: 'var(--radius-md)', maxWidth: '100vw' }}>
                                     <CalendarPicker range={upFilterDateRange} classDates={upDatesSet} onChange={setUpFilterDateRange} mode={upCalMode} onModeChange={setUpCalMode} onClose={() => setUpShowCal(false)} />
                                 </div>
                             )}
@@ -1131,7 +1131,7 @@ const InstructorDashboard: React.FC = () => {
                                         {pastFilterDateRange ? (pastFilterDateRange.start === pastFilterDateRange.end ? pastFilterDateRange.start : `${pastFilterDateRange.start} – ${pastFilterDateRange.end}`) : '📅 Date'}
                                     </button>
                                     {pastShowCal && (
-                                        <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 100, boxShadow: 'var(--shadow-lg)', borderRadius: 'var(--radius-md)' }}>
+                                        <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, left: 'auto', zIndex: 100, boxShadow: 'var(--shadow-lg)', borderRadius: 'var(--radius-md)', maxWidth: '100vw' }}>
                                             <CalendarPicker range={pastFilterDateRange} classDates={pastDatesSet} onChange={setPastFilterDateRange} mode={pastCalMode} onModeChange={setPastCalMode} onClose={() => setPastShowCal(false)} />
                                         </div>
                                     )}

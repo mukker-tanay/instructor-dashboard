@@ -76,12 +76,12 @@ const MetabaseQueries: React.FC = () => {
 
     return (
         <div className="page-container">
-            <div className="action-bar">
+            <div className="action-bar" style={{ flexWrap: 'wrap', gap: 'var(--space-sm)' }}>
                 <div className="page-header" style={{ marginBottom: 0 }}>
                     <h1 className="page-title">Metabase Queries</h1>
                     <p className="page-subtitle">Saved Metabase report and query links</p>
                 </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
                     <button className="btn btn-secondary btn-sm" onClick={load} disabled={loading} title="Refresh list">
                         {loading ? '…' : '↻ Refresh'}
                     </button>
@@ -181,7 +181,7 @@ const MetabaseQueries: React.FC = () => {
             ) : (
                 <div style={{ display: 'grid', gap: 'var(--space-md)' }}>
                     {filtered.map(q => (
-                        <div key={q.id} className="card" style={{ padding: 'var(--space-md) var(--space-lg)', display: 'flex', alignItems: 'center', gap: 'var(--space-lg)' }}>
+                        <div key={q.id} className="card" style={{ padding: 'var(--space-md) var(--space-lg)', display: 'flex', alignItems: 'center', gap: 'var(--space-lg)', flexWrap: 'wrap' }}>
                             {/* Chart icon */}
                             <div style={{
                                 width: '40px', height: '48px', flexShrink: 0, borderRadius: '6px',
