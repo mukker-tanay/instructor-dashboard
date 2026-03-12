@@ -225,14 +225,14 @@ const PoliciesPage: React.FC = () => {
             ) : (
                 <div style={{ display: 'grid', gap: 'var(--space-md)' }}>
                     {filtered.map(policy => (
-                        <div key={policy.row} className="card" style={{ padding: 'var(--space-md) var(--space-lg)', display: 'flex', alignItems: 'flex-start', gap: 'var(--space-lg)', flexWrap: 'wrap' }}>
+                        <div key={policy.row} className="card" style={{ padding: '12px var(--space-lg)', display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
                             {/* File icon */}
                             <div style={{
-                                width: '40px', height: '48px', flexShrink: 0, borderRadius: '6px',
-                                background: 'rgba(239,68,68,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                border: '1px solid rgba(239,68,68,0.2)',
+                                width: '38px', height: '38px', flexShrink: 0, borderRadius: '8px',
+                                background: 'rgba(239,68,68,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                border: '1px solid rgba(239,68,68,0.18)',
                             }}>
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                                     <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="var(--danger)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                                     <polyline points="14,2 14,8 20,8" stroke="var(--danger)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                                     <line x1="9" y1="13" x2="15" y2="13" stroke="var(--danger)" strokeWidth="1.5" strokeLinecap="round" />
@@ -253,12 +253,12 @@ const PoliciesPage: React.FC = () => {
                                     )}
                                 </div>
                                 {policy.description && (
-                                    <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '4px', marginBottom: 0 }}>
+                                    <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '2px', marginBottom: 0 }}>
                                         {policy.description}
                                     </p>
                                 )}
                                 {canManage && (
-                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '6px' }}>
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                                         Added by {policy.added_by || 'Admin'}{policy.added_at ? ` · ${policy.added_at}` : ''}
                                     </div>
                                 )}
