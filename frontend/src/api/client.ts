@@ -98,4 +98,20 @@ export const addPolicy = (data: { name: string; url: string; description?: strin
 export const deletePolicy = (rowIndex: number) =>
     api.delete(`/policies/${rowIndex}`).then(r => r.data);
 
+/* ── Metabase Queries ── */
+export interface MetabaseQuery {
+    id: string;
+    title: string;
+    url: string;
+    description: string;
+    added_by: string;
+    created_at: string;
+}
+export const getMetabaseQueries = () =>
+    api.get<{ queries: MetabaseQuery[]; total: number }>('/metabase').then(r => r.data);
+export const addMetabaseQuery = (data: { title: string; url: string; description?: string }) =>
+    api.post('/metabase', data).then(r => r.data);
+export const deleteMetabaseQuery = (queryId: string) =>
+    api.delete(`/metabase/${queryId}`).then(r => r.data);
+
 export default api;

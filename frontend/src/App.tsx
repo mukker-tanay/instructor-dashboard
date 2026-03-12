@@ -12,6 +12,7 @@ import MyBatches from './pages/instructor/MyBatches';
 import PoliciesPage from './pages/instructor/PoliciesPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import ImpersonateRoute from './pages/admin/ImpersonateRoute';
+import MetabaseQueries from './pages/admin/MetabaseQueries';
 
 const queryClient = new QueryClient({
     defaultOptions: {
@@ -111,6 +112,9 @@ const AppContent: React.FC = () => {
             {/* Admin routes */}
             <Route path="/instructor/admin" element={
                 <ProtectedRoute adminOnly><AppLayout><AdminDashboard /></AppLayout></ProtectedRoute>
+            } />
+            <Route path="/admin/metabase" element={
+                <ProtectedRoute adminOnly><AppLayout><MetabaseQueries /></AppLayout></ProtectedRoute>
             } />
             <Route path="/admin/becomes/:email" element={
                 <ProtectedRoute adminOnly><ImpersonateRoute /></ProtectedRoute>

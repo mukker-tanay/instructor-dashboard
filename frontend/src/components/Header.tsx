@@ -86,6 +86,14 @@ const Header: React.FC = () => {
                                     Admin
                                 </Link>
                             )}
+                            {user?.role === 'admin' && (
+                                <Link
+                                    to="/admin/metabase"
+                                    className={`nav-link ${isActive('/admin/metabase') ? 'active' : ''}`}
+                                >
+                                    Metabase
+                                </Link>
+                            )}
                         </nav>
                     </div>
 
