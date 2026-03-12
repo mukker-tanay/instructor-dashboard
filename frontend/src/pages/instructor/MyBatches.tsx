@@ -20,8 +20,7 @@ const MyBatches: React.FC = () => {
         getMyBatches()
             .then(d => {
                 setBatches(d.batches);
-                // Auto-expand all batches on first load
-                setExpandedBatches(new Set(Object.keys(d.batches)));
+                // Batches start collapsed — user opens the ones they need
             })
             .catch(() => setError('Failed to load batch data.'))
             .finally(() => setLoading(false));
@@ -61,7 +60,34 @@ const MyBatches: React.FC = () => {
         );
     }
 
-    const batchNames = Object.keys(batches);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const isCurrent = (batch: BatchData): boolean => {
+        return Object.values(batch.modules).some(classes =>
+            classes.some(cls => {
+                const s = String(cls['class_date'] || '').trim();
+                // MM/DD/YYYY
+                if (s.includes('/')) {
+                    const [m, d, y] = s.split('/').map(Number);
+                    return new Date(y, m - 1, d) >= today;
+                }
+                // YYYY-MM-DD
+                if (s.includes('-') && s.length >= 10) {
+                    const dt = new Date(s.substring(0, 10));
+                    return dt >= today;
+                }
+                return false;
+            })
+        );
+    };
+
+    const batchNames = Object.keys(batches).sort((a, b) => {
+        const aCurrent = isCurrent(batches[a]) ? 0 : 1;
+        const bCurrent = isCurrent(batches[b]) ? 0 : 1;
+        if (aCurrent !== bCurrent) return aCurrent - bCurrent;
+        return a.localeCompare(b); // alphabetical within same group
+    });
 
     if (batchNames.length === 0) {
         return (

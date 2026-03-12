@@ -3,6 +3,7 @@ import { getClasses, createUnavailabilityRequest, createClassAdditionRequest, ge
 import type { ClassItem } from '../../types';
 import Modal from '../../components/Modal';
 import type { BatchMeta } from '../../api/client';
+import { formatDate } from '../../utils/formatDate';
 
 /* ─── Unavailability Modal for a single class ─── */
 interface UnavailModalProps {
@@ -70,7 +71,7 @@ const UnavailabilityModal: React.FC<UnavailModalProps> = ({ cls, isOpen, onClose
             <div style={{ marginBottom: 'var(--space-md)', padding: '10px 14px', background: 'var(--surface-elevated)', borderRadius: 'var(--radius-sm)', fontSize: '0.8125rem' }}>
                 <div style={{ fontWeight: 600, marginBottom: '4px' }}>{cls['class_topic']}</div>
                 <div style={{ color: 'var(--text-muted)' }}>
-                    {cls['sb_names']} &middot; {cls['class_date']} &middot; {cls['time_of_day']} IST
+                    {cls['sb_names']} &middot; {formatDate(cls['class_date'])} &middot; {cls['time_of_day']} IST
                 </div>
             </div>
 
@@ -622,7 +623,7 @@ const ClassCard: React.FC<ClassCardProps> = ({ cls, index, isPast, hasExistingRe
 
             {/* Date & Time — prominent */}
             <div style={{ margin: '10px 0', display: 'flex', alignItems: 'center', gap: '16px', fontSize: '0.9375rem', fontWeight: 600, color: 'var(--accent-primary)' }}>
-                <span> {cls['class_date']}</span>
+                <span>{formatDate(cls['class_date'])}</span>
                 <span> {cls['time_of_day']} IST</span>
             </div>
 

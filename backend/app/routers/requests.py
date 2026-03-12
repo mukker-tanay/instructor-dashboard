@@ -24,6 +24,27 @@ router = APIRouter(prefix="/api", tags=["requests"])
 
 IST = timezone(timedelta(hours=5, minutes=30))
 
+_MONTHS = [
+    'January','February','March','April','May','June',
+    'July','August','September','October','November','December',
+]
+
+def _fmt_date(date_str: str) -> str:
+    """Convert YYYY-MM-DD or MM/DD/YYYY to '13 March 2026' display format."""
+    s = str(date_str).strip()
+    try:
+        if len(s) >= 10 and s[4] == '-':          # YYYY-MM-DD
+            y, m, d = int(s[:4]), int(s[5:7]), int(s[8:10])
+            return f"{d} {_MONTHS[m-1]} {y}"
+        if '/' in s:                               # MM/DD/YYYY
+            parts = s.split('/')
+            if len(parts) == 3:
+                m, d, y = int(parts[0]), int(parts[1]), int(parts[2])
+                return f"{d} {_MONTHS[m-1]} {y}"
+    except Exception:
+        pass
+    return s  # fallback: return as-is
+
 def _check_duplicate_unavailability(email: str, batch: str, class_title: str, date_str: str) -> None:
     """Block if an active (Pending) unavailability request already exists for the same class."""
     try:
@@ -65,11 +86,12 @@ async def create_unavailability_request(
     for cls in body.classes:
         date_str = str(cls.get("date_of_class", cls.get("class_date", "")))
         time_str = str(cls.get("time_of_class", cls.get("time_of_day", "")))
+        date_fmt = _fmt_date(date_str)  # "13 March 2026" format
 
         # Validations
         batch = str(cls.get('batch_name', cls.get('sb_names', '')))
         title = str(cls.get('class_title', cls.get('class_topic', '')))
-        _check_duplicate_unavailability(user.email, batch, title, date_str)
+        _check_duplicate_unavailability(user.email, batch, title, date_fmt)
 
         request_id = str(uuid.uuid4())
         now_dt = datetime.now(IST)
@@ -84,7 +106,7 @@ async def create_unavailability_request(
             "sbat_group_id": cls.get("sbat_group_id", ""),
             "module_name": cls.get("module_name", ""),
             "class_title": cls.get("class_title", cls.get("class_topic", "")),
-            "original_date_of_class": date_str,
+            "original_date_of_class": date_fmt,
             "original_time_of_class": time_str,
             "class_type": cls.get("class_type", ""),
             "reason_for_unavailability": body.reason,
@@ -139,7 +161,7 @@ async def create_unavailability_request(
             "sbat_group_id":         str(sbat),
             "class_title":           class_title,
             "module_name":           module,
-            "date_of_class":         date_str,
+            "date_of_class":         date_fmt,
             "time_of_class":         time_str,
             "class_type":            class_type,
             "reason":                body.reason,
@@ -168,8 +190,9 @@ async def create_class_addition_request(
     user: UserInfo = Depends(get_current_user),
 ):
     """Raise a class addition request."""
-    # Duplicate check
-    _check_duplicate_class_addition(user.email, body.batch_name, body.date_of_class, body.time_of_class)
+    # Duplicate check — format date first so stored value matches query
+    date_fmt = _fmt_date(body.date_of_class)
+    _check_duplicate_class_addition(user.email, body.batch_name, date_fmt, body.time_of_class)
 
     request_id = str(uuid.uuid4())
     now_dt = datetime.now(IST)
@@ -183,7 +206,7 @@ async def create_class_addition_request(
         "batch_name": body.batch_name,
         "class_title": body.class_title,
         "module_name": body.module_name,
-        "date_of_class": body.date_of_class,
+        "date_of_class": date_fmt,
         "time_of_class": body.time_of_class,
         "class_type": body.class_type,
         "shift_other_classes_by_1": body.shift_other_classes,
@@ -234,7 +257,7 @@ async def create_class_addition_request(
         "batch_name":             body.batch_name,
         "class_title":            body.class_title,
         "module_name":            body.module_name,
-        "date_of_class":          body.date_of_class,
+        "date_of_class":          date_fmt,
         "time_of_class":          body.time_of_class,
         "class_type":             body.class_type,
         "shift_other_classes":    body.shift_other_classes,
