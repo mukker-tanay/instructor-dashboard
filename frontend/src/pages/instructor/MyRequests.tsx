@@ -63,7 +63,13 @@ const MyRequests: React.FC = () => {
                         (isUnavail
                             ? r['Original Time of Class (HH:MM AM/PM) IST']
                             : r['Time of Class (HH:MM AM/PM) IST']) || '';
-                    const raised = r['Raised Timestamp'] || r['Time stamp'] || '';
+                    const raisedRaw = r['Raised Timestamp'] || r['Time stamp'] || '';
+                    const raised = raisedRaw
+                        ? new Date(raisedRaw).toLocaleString('en-IN', {
+                            day: 'numeric', month: 'short', year: 'numeric',
+                            hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata'
+                        })
+                        : '';
 
                     return (
                         <div key={i} className="card class-card" style={{ animationDelay: `${i * 40}ms` }}>
