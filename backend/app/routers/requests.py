@@ -217,7 +217,7 @@ async def create_class_addition_request(
         if not name:
             return ""
         try:
-            res = supabase.table("slack_members").select("id").ilike("name", name.strip()).limit(1).execute()
+            res = supabase.table("slack_members").select("id").ilike("name", f"%{name.strip()}%").limit(1).execute()
             if res.data:
                 return str(res.data[0].get("id", "")).strip()
         except Exception as e:
