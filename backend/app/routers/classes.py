@@ -180,6 +180,7 @@ async def get_batch_metadata(user: UserInfo = Depends(get_current_user)):
     result = {
         batch: {"program": info["program"], "modules": sorted(info["modules"])}
         for batch, info in meta.items()
+        if info["modules"]  # only include batches with at least one upcoming module
     }
     return {"batch_metadata": result}
 

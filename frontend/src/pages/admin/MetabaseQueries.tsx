@@ -168,7 +168,7 @@ const MetabaseQueries: React.FC = () => {
                 )}
             </div>
 
-            {/* Query cards grid */}
+            {/* Query list */}
             {loading ? (
                 <div className="loading-container"><div className="spinner" /></div>
             ) : filtered.length === 0 ? (
@@ -179,86 +179,57 @@ const MetabaseQueries: React.FC = () => {
                     </p>
                 </div>
             ) : (
-                <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(3, 1fr)',
-                    gap: 'var(--space-md)',
-                }}>
+                <div style={{ display: 'grid', gap: 'var(--space-md)' }}>
                     {filtered.map(q => (
-                        <div
-                            key={q.id}
-                            className="card"
-                            style={{
-                                padding: 'var(--space-md)',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '8px',
-                                transition: 'transform 0.15s, box-shadow 0.15s',
-                                position: 'relative',
-                            }}
-                            onMouseEnter={e => {
-                                (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)';
-                                (e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow-lg)';
-                            }}
-                            onMouseLeave={e => {
-                                (e.currentTarget as HTMLElement).style.transform = '';
-                                (e.currentTarget as HTMLElement).style.boxShadow = '';
-                            }}
-                        >
-                            {/* Metabase icon */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <div style={{
-                                    width: '32px', height: '32px', flexShrink: 0, borderRadius: '6px',
-                                    background: 'rgba(89, 131, 176, 0.15)',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    border: '1px solid rgba(89, 131, 176, 0.25)',
-                                }}>
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                                        <rect x="3" y="3" width="18" height="18" rx="2" stroke="#5983B0" strokeWidth="1.5" />
-                                        <path d="M7 16l3-4 3 3 3-5" stroke="#5983B0" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                    </svg>
-                                </div>
+                        <div key={q.id} className="card" style={{ padding: 'var(--space-md) var(--space-lg)', display: 'flex', alignItems: 'center', gap: 'var(--space-lg)' }}>
+                            {/* Chart icon */}
+                            <div style={{
+                                width: '40px', height: '48px', flexShrink: 0, borderRadius: '6px',
+                                background: 'rgba(89, 131, 176, 0.12)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                border: '1px solid rgba(89, 131, 176, 0.25)',
+                            }}>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                    <rect x="3" y="3" width="18" height="18" rx="2" stroke="#5983B0" strokeWidth="1.5" />
+                                    <path d="M7 16l3-4 3 3 3-5" stroke="#5983B0" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                            </div>
+
+                            {/* Text */}
+                            <div style={{ flex: 1, minWidth: 0 }}>
                                 <a
                                     href={q.url}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    style={{
-                                        fontWeight: 600,
-                                        fontSize: '0.875rem',
-                                        color: 'var(--primary)',
-                                        textDecoration: 'none',
-                                        flex: 1,
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis',
-                                        whiteSpace: 'nowrap',
-                                    }}
-                                    title={q.title}
+                                    style={{ fontWeight: 600, fontSize: '0.9375rem', color: 'var(--primary)', textDecoration: 'none' }}
                                 >
                                     {q.title} ↗
                                 </a>
+                                {q.description && (
+                                    <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '4px', marginBottom: 0 }}>
+                                        {q.description}
+                                    </p>
+                                )}
+                                {canManage && q.added_by && (
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '6px' }}>
+                                        Added by {q.added_by}
+                                    </div>
+                                )}
                             </div>
 
-                            {q.description && (
-                                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.45 }}>
-                                    {q.description}
-                                </p>
-                            )}
-
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto' }}>
-                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                                    Added by {q.added_by}
-                                </span>
-                                {canManage && (
+                            {/* Delete (admin only) */}
+                            {canManage && (
+                                <div style={{ flexShrink: 0 }}>
                                     <button
                                         className="btn btn-sm"
                                         onClick={() => handleDelete(q)}
                                         disabled={deletingId === q.id}
-                                        style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid rgba(239,68,68,0.2)', fontSize: '0.75rem', padding: '3px 8px' }}
+                                        style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid rgba(239,68,68,0.2)' }}
                                     >
                                         {deletingId === q.id ? '...' : 'Delete'}
                                     </button>
-                                )}
-                            </div>
+                                </div>
+                            )}
                         </div>
                     ))}
                 </div>

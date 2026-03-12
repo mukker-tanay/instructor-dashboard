@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { getClasses, createUnavailabilityRequest, createClassAdditionRequest, getMyBatches, getMyRequests, getBatchMetadata, getInstructorOptions } from '../../api/client';
+import { getClasses, createUnavailabilityRequest, createClassAdditionRequest, getMyRequests, getBatchMetadata, getInstructorOptions } from '../../api/client';
 import type { ClassItem } from '../../types';
 import Modal from '../../components/Modal';
 import type { BatchMeta } from '../../api/client';
@@ -268,17 +268,13 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
     const [step, setStep] = useState<'form' | 'confirm'>('form');
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
-    const [batchOptions, setBatchOptions] = useState<string[]>([]);
     const [batchMeta, setBatchMeta] = useState<Record<string, BatchMeta>>({});
     const [customBatchName, setCustomBatchName] = useState('');
     const [approver, setApprover] = useState('');
 
-    // Fetch instructor's own batches + metadata on open
+    // Fetch batch metadata (upcoming batches + modules) on open
     React.useEffect(() => {
         if (isOpen) {
-            getMyBatches()
-                .then(d => { setBatchOptions(Object.keys(d.batches)); })
-                .catch(err => console.error('my-batches error:', err));
             getBatchMetadata()
                 .then(d => { setBatchMeta(d.batch_metadata); })
                 .catch(err => console.error('batch-metadata error:', err));
@@ -313,7 +309,8 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
         ? [...batchMeta[form.batch_name].modules, 'Others']
         : ['Others'];
 
-    const batchDropdownOptions = [...batchOptions, 'Others'];
+    // Only batches that have upcoming modules (from getBatchMetadata) + 'Others'
+    const batchDropdownOptions = [...Object.keys(batchMeta).sort(), 'Others'];
 
     /* Format YYYY-MM-DD → DD/MM/YYYY for display */
     const formatDateDisplay = (val: string) => {
