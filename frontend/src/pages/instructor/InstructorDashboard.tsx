@@ -262,6 +262,7 @@ interface ClassAddModalProps {
 const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onSuccess }) => {
     const [form, setForm] = useState({
         program: '', batch_name: '', class_title: '', module_name: '',
+        module_name_other: '',
         date_of_class: '', time_of_class: '', class_type: 'Regular',
         shift_other_classes: 'No',
         assignment_requirement: 'None', reason: '', other_comments: '',
@@ -292,6 +293,7 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
                 batch_name: 'Others',
                 program: '',
                 module_name: '',
+                module_name_other: '',
             }));
             return;
         }
@@ -301,6 +303,7 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
             batch_name: batch,
             program: meta?.program || '',
             module_name: '',
+            module_name_other: '',
         }));
     };
 
@@ -312,6 +315,11 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
 
     // Only batches that have upcoming modules (from getBatchMetadata) + 'Others'
     const batchDropdownOptions = [...Object.keys(batchMeta).sort(), 'Others'];
+
+    // Unique program names for the program dropdown (used when batch = Others)
+    const programOptions = [...new Set(
+        Object.values(batchMeta).map(m => m.program).filter(Boolean)
+    )].sort();
 
     /* Format YYYY-MM-DD → DD/MM/YYYY for display */
     const formatDateDisplay = (val: string) => {
@@ -335,6 +343,10 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
                 return false;
             }
         }
+        if (form.module_name === 'Others' && !form.module_name_other.trim()) {
+            setError('Please describe the module in the "Others" text field.');
+            return false;
+        }
         if (!approver) {
             setError('Please select an approver.');
             return false;
@@ -348,9 +360,15 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
         setSubmitting(true);
         setError('');
         try {
+            // Resolve batch name and module name (replace 'Others' with custom text)
+            const resolvedModule = form.module_name === 'Others'
+                ? form.module_name_other.trim()
+                : form.module_name;
             const submitForm = isOthersBatch
-                ? { ...form, batch_name: customBatchName.trim() }
-                : form;
+                ? { ...form, batch_name: customBatchName.trim(), module_name: resolvedModule }
+                : { ...form, module_name: resolvedModule };
+            // Remove helper field before sending
+            delete (submitForm as any).module_name_other;
             await createClassAdditionRequest({ ...submitForm, approver });
             resetForm();
             onSuccess();
@@ -365,6 +383,7 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
     const resetForm = () => {
         setForm({
             program: '', batch_name: '', class_title: '', module_name: '',
+            module_name_other: '',
             date_of_class: '', time_of_class: '', class_type: 'Regular',
             shift_other_classes: 'No',
             assignment_requirement: 'None', reason: '', other_comments: '',
@@ -409,14 +428,22 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
                         </div>
                         <div className="form-group" style={{ minWidth: 0 }}>
                             <label className="form-label form-label-required">Program</label>
-                            <input
-                                className="form-input"
-                                value={form.program}
-                                readOnly={!isOthersBatch}
-                                onChange={isOthersBatch ? e => update('program', e.target.value) : undefined}
-                                placeholder={isOthersBatch ? 'Enter program name' : 'Auto-filled from batch'}
-                                style={{ background: isOthersBatch ? 'var(--bg-input)' : 'var(--bg-secondary)', cursor: isOthersBatch ? 'text' : 'not-allowed', color: form.program ? 'var(--text-primary)' : 'var(--text-muted)', backgroundImage: 'none' }}
-                            />
+                            {isOthersBatch ? (
+                                <SearchableDropdown
+                                    options={programOptions}
+                                    value={form.program}
+                                    onChange={v => update('program', v)}
+                                    placeholder="Select program..."
+                                />
+                            ) : (
+                                <input
+                                    className="form-input"
+                                    value={form.program}
+                                    readOnly
+                                    placeholder="Auto-filled from batch"
+                                    style={{ background: 'var(--bg-secondary)', cursor: 'not-allowed', color: form.program ? 'var(--text-primary)' : 'var(--text-muted)', backgroundImage: 'none' }}
+                                />
+                            )}
                         </div>
                     </div>
                     {/* Manual batch name input when "Others" is selected */}
@@ -435,7 +462,7 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
 
                     {/* Row 2: Module Name + Class Title */}
                     <div className="form-row">
-                        <div className="form-group">
+                        <div className="form-group" style={{ minWidth: 0 }}>
                             <label className="form-label form-label-required">Module Name</label>
                             <SearchableDropdown
                                 options={moduleOptions}
@@ -444,6 +471,15 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
                                 placeholder="Select module..."
                                 disabled={!form.batch_name}
                             />
+                            {form.module_name === 'Others' && (
+                                <input
+                                    className="form-input"
+                                    style={{ backgroundImage: 'none', marginTop: '8px' }}
+                                    value={form.module_name_other}
+                                    onChange={e => update('module_name_other', e.target.value)}
+                                    placeholder="Please specify the module name"
+                                />
+                            )}
                         </div>
                         <div className="form-group">
                             <label className="form-label form-label-required">Class Title</label>
