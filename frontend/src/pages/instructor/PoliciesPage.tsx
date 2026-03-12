@@ -257,9 +257,11 @@ const PoliciesPage: React.FC = () => {
                                         {policy.description}
                                     </p>
                                 )}
-                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '6px' }}>
-                                    Added by {policy.added_by || 'Admin'}{policy.added_at ? ` · ${policy.added_at}` : ''}
-                                </div>
+                                {canManage && (
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '6px' }}>
+                                        Added by {policy.added_by || 'Admin'}{policy.added_at ? ` · ${policy.added_at}` : ''}
+                                    </div>
+                                )}
                             </div>
 
                             {/* Actions */}
