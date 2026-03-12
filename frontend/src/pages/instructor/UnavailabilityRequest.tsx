@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { getClasses, createUnavailabilityRequest } from '../../api/client';
 import type { ClassItem } from '../../types';
 import Modal from '../../components/Modal';
+import { formatDate } from '../../utils/formatDate';
 
 const UnavailabilityRequest: React.FC = () => {
     const [upcoming, setUpcoming] = useState<ClassItem[]>([]);
@@ -193,7 +194,7 @@ const UnavailabilityRequest: React.FC = () => {
                                         <span className="card-meta-label">Batch:</span> {cls['sb_names']}
                                     </span>
                                     <span className="card-meta-item">
-                                        <span className="card-meta-label">Date:</span> {cls['class_date']}
+                                        <span className="card-meta-label">Date:</span> {formatDate(cls['class_date'])}
                                     </span>
                                     <span className="card-meta-item">
                                         <span className="card-meta-label">Time:</span> {cls['time_of_day']}
@@ -235,7 +236,7 @@ const UnavailabilityRequest: React.FC = () => {
                             <div className="selected-summary-title">Selected Classes ({selectedClasses.length})</div>
                             {selectedClasses.map((cls, i) => (
                                 <span key={i} className="selected-chip">
-                                    {cls['class_topic']} — {cls['class_date']}
+                                    {cls['class_topic']} — {formatDate(cls['class_date'])}
                                 </span>
                             ))}
                         </div>

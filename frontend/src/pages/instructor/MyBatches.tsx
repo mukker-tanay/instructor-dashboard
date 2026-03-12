@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getMyBatches } from '../../api/client';
+import { formatDate } from '../../utils/formatDate';
 
 type ClassItem = Record<string, any>;
 type BatchData = {
@@ -233,7 +234,7 @@ const BatchClassCard: React.FC<{ cls: ClassItem; index: number }> = ({ cls, inde
             </div>
 
             <div style={{ margin: '8px 0', display: 'flex', alignItems: 'center', gap: '16px', fontSize: '0.875rem', fontWeight: 600, color: 'var(--accent-primary)' }}>
-                <span>{cls['class_date']}</span>
+                <span>{formatDate(cls['class_date'])}</span>
                 <span>{cls['time_of_day']} IST</span>
             </div>
 

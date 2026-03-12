@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { getClasses, createUnavailabilityRequest, getInstructorOptions } from '../../api/client';
 import type { ClassItem } from '../../types';
 import Modal from '../../components/Modal';
+import { formatDate } from '../../utils/formatDate';
 
 
 /* ─── SearchableDropdown (same as InstructorDashboard) ─── */
@@ -151,7 +152,7 @@ const UnavailabilityModal: React.FC<{
             <div style={{ marginBottom: 'var(--space-md)', padding: '10px 14px', background: 'var(--surface-elevated)', borderRadius: 'var(--radius-sm)', fontSize: '0.8125rem' }}>
                 <div style={{ fontWeight: 600, marginBottom: '4px' }}>{cls['class_topic']}</div>
                 <div style={{ color: 'var(--text-muted)' }}>
-                    {cls['sb_names']} &middot; {cls['class_date']} &middot; {cls['time_of_day']} IST
+                    {cls['sb_names']} &middot; {formatDate(cls['class_date'])} &middot; {cls['time_of_day']} IST
                 </div>
             </div>
             {error && (
@@ -296,7 +297,7 @@ const PastClasses: React.FC = () => {
                                             </td>
                                             <td>{cls['class_topic']}</td>
                                             <td>
-                                                {cls['class_date']}
+                                                {formatDate(cls['class_date'])}
                                                 <br />
                                                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                                                     {cls['time_of_day']} IST
