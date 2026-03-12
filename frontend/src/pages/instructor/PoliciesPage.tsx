@@ -27,7 +27,7 @@ const PoliciesPage: React.FC = () => {
     const [form, setForm] = useState({ name: '', url: '', description: '', category: '' });
     const [submitting, setSubmitting] = useState(false);
     const [deletingRow, setDeletingRow] = useState<number | null>(null);
-    const [viewingPolicy, setViewingPolicy] = useState<Policy | null>(null);
+
 
     // search / filter
     const [search, setSearch] = useState('');
@@ -134,7 +134,7 @@ const PoliciesPage: React.FC = () => {
                 <div className="card" style={{ marginBottom: 'var(--space-lg)', padding: 'var(--space-lg)' }}>
                     <h3 style={{ fontSize: '0.9375rem', fontWeight: 600, marginBottom: '4px' }}>New Policy</h3>
                     <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: 'var(--space-md)' }}>
-                        Commit the PDF / DOC file to <code style={{ fontSize: '0.75rem', background: 'var(--bg-secondary)', padding: '1px 5px', borderRadius: '4px' }}>frontend/public/policies/</code>, then enter its path below.
+                        Paste a Google Docs, Drive, or any document URL below.
                     </p>
                     <form onSubmit={handleAdd}>
                         <div className="form-row">
@@ -160,16 +160,16 @@ const PoliciesPage: React.FC = () => {
                             </div>
                         </div>
                         <div className="form-group">
-                            <label className="form-label form-label-required">File Path</label>
+                            <label className="form-label form-label-required">Document URL</label>
                             <input
                                 className="form-input"
                                 value={form.url}
                                 onChange={e => setForm(f => ({ ...f, url: e.target.value }))}
-                                placeholder="/policies/leave-policy-2025.pdf"
+                                placeholder="https://docs.google.com/document/d/..."
                                 style={{ backgroundImage: 'none' }}
                             />
                             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>
-                                Use a path starting with <code style={{ fontSize: '0.7rem', background: 'var(--bg-secondary)', padding: '1px 4px', borderRadius: '3px' }}>/policies/</code> (served from the frontend's public folder)
+                                Paste any Google Docs, Drive, or external document link.
                             </span>
                         </div>
                         <div className="form-group">
@@ -264,12 +264,14 @@ const PoliciesPage: React.FC = () => {
 
                             {/* Actions */}
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                                <button
+                                <a
+                                    href={policy.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
                                     className="btn btn-primary btn-sm"
-                                    onClick={() => setViewingPolicy(policy)}
                                 >
-                                    View
-                                </button>
+                                    View ↗
+                                </a>
                                 {canManage && (
                                     <button
                                         className="btn btn-sm"
@@ -286,45 +288,6 @@ const PoliciesPage: React.FC = () => {
                 </div>
             )}
 
-            {/* ── PDF / Doc viewer modal ── */}
-            {viewingPolicy && (
-                <div className="modal-overlay" onClick={() => setViewingPolicy(null)} style={{ zIndex: 1000 }}>
-                    <div
-                        className="modal"
-                        onClick={e => e.stopPropagation()}
-                        style={{ width: '92vw', maxWidth: '1100px', height: '90vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}
-                    >
-                        {/* Header */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '14px 20px', borderBottom: '1px solid var(--border)', flexShrink: 0, flexWrap: 'wrap', gap: '8px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                                <span style={{ fontWeight: 600, fontSize: '0.9375rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{viewingPolicy.name}</span>
-                                {viewingPolicy.category && (
-                                    <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 500, background: 'rgba(99,102,241,0.12)', color: 'var(--accent-primary)', flexShrink: 0 }}>
-                                        {viewingPolicy.category}
-                                    </span>
-                                )}
-                            </div>
-                            <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-                                <a
-                                    href={viewingPolicy.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="btn btn-secondary btn-sm"
-                                >
-                                    Open in new tab
-                                </a>
-                                <button className="btn btn-ghost btn-sm" onClick={() => setViewingPolicy(null)} style={{ fontSize: '1.1rem', lineHeight: 1 }}>✕</button>
-                            </div>
-                        </div>
-                        {/* Document viewer */}
-                        <iframe
-                            src={viewingPolicy.url}
-                            title={viewingPolicy.name}
-                            style={{ flex: 1, border: 'none', width: '100%', display: 'block' }}
-                        />
-                    </div>
-                </div>
-            )}
         </div>
     );
 };
