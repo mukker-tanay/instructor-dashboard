@@ -24,8 +24,10 @@ class Settings(BaseSettings):
     slack_webhook_url: str = ""           # Legacy / generic webhook (deprecated)
     slack_bot_token: str = ""
     slack_channel_id: str = ""
-    slack_unavailability_webhook: str = ""   # Workflow webhook for unavailability requests
-    slack_class_addition_webhook: str = ""   # Workflow webhook for class addition requests
+    slack_unavailability_webhook_academy_devops: str = ""
+    slack_unavailability_webhook_dsml_aiml: str = ""
+    slack_class_addition_webhook_academy_devops: str = ""
+    slack_class_addition_webhook_dsml_aiml: str = ""
 
     # JWT
     jwt_secret: str = "change-me-in-production"

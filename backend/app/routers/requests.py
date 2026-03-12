@@ -151,7 +151,13 @@ async def create_unavailability_request(
         }
 
         # Send Slack Workflow notification (awaited to ensure it fires on Vercel serverless)
-        await send_workflow_payload(settings.slack_unavailability_webhook, workflow_data)
+        program_lower = program.lower()
+        if "academy" in program_lower or "devops" in program_lower:
+            webhook_url = settings.slack_unavailability_webhook_academy_devops
+        else:
+            webhook_url = settings.slack_unavailability_webhook_dsml_aiml
+            
+        await send_workflow_payload(webhook_url, workflow_data)
 
     return {"message": "Unavailability request(s) submitted.", "requests": results}
 
@@ -240,7 +246,13 @@ async def create_class_addition_request(
     }
 
     # Send Slack Workflow notification (awaited to ensure it fires on Vercel serverless)
-    await send_workflow_payload(settings.slack_class_addition_webhook, workflow_data)
+    program_lower = body.program.lower()
+    if "academy" in program_lower or "devops" in program_lower:
+        webhook_url = settings.slack_class_addition_webhook_academy_devops
+    else:
+        webhook_url = settings.slack_class_addition_webhook_dsml_aiml
+        
+    await send_workflow_payload(webhook_url, workflow_data)
 
     return {"message": "Class addition request submitted.", "request_id": request_id}
 
