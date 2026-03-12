@@ -114,7 +114,7 @@ const AppContent: React.FC = () => {
                 <ProtectedRoute adminOnly><AppLayout><AdminDashboard /></AppLayout></ProtectedRoute>
             } />
             <Route path="/admin/metabase" element={
-                <ProtectedRoute adminOnly><AppLayout><MetabaseQueries /></AppLayout></ProtectedRoute>
+                <ProtectedRoute><AppLayout><MetabaseQueries /></AppLayout></ProtectedRoute>
             } />
             <Route path="/admin/becomes/:email" element={
                 <ProtectedRoute adminOnly><ImpersonateRoute /></ProtectedRoute>

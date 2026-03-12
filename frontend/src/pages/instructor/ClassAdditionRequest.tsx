@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { createClassAdditionRequest, getMyBatches, getBatchMetadata } from '../../api/client';
+import { createClassAdditionRequest, getBatchMetadata } from '../../api/client';
 import type { BatchMeta } from '../../api/client';
 import Modal from '../../components/Modal';
 
@@ -154,6 +154,7 @@ const ClassAdditionRequest: React.FC = () => {
         batch_name: '',
         class_title: '',
         module_name: '',
+        module_name_other: '',   // for "Others" free-text
         date_of_class: '',
         time_of_class: '',
         class_type: 'Regular',
@@ -167,13 +168,9 @@ const ClassAdditionRequest: React.FC = () => {
     const [submitting, setSubmitting] = useState(false);
     const [success, setSuccess] = useState('');
     const [error, setError] = useState('');
-    const [batchOptions, setBatchOptions] = useState<string[]>([]);
     const [batchMeta, setBatchMeta] = useState<Record<string, BatchMeta>>({});
 
     useEffect(() => {
-        getMyBatches()
-            .then(d => setBatchOptions(Object.keys(d.batches)))
-            .catch(err => console.error('my-batches error:', err));
         getBatchMetadata()
             .then(d => setBatchMeta(d.batch_metadata))
             .catch(err => console.error('batch-metadata error:', err));
@@ -190,8 +187,12 @@ const ClassAdditionRequest: React.FC = () => {
             batch_name: batch,
             program: meta?.program || '',
             module_name: '',
+            module_name_other: '',
         }));
     };
+
+    // Derived batch options: only batches present in batch_metadata (i.e., have upcoming classes)
+    const batchOptions = Object.keys(batchMeta).sort();
 
     const moduleOptions = form.batch_name && batchMeta[form.batch_name]
         ? [...batchMeta[form.batch_name].modules, 'Others']
@@ -206,6 +207,11 @@ const ClassAdditionRequest: React.FC = () => {
                 setError(`Please fill the "${label.charAt(0).toUpperCase() + label.slice(1)}" field.`);
                 return false;
             }
+        }
+        // If module is "Others", require the custom text
+        if (form.module_name === 'Others' && !form.module_name_other.trim()) {
+            setError('Please describe the module in the "Others" text field.');
+            return false;
         }
         if (!approver) {
             setError('Please select an approver.');
@@ -222,12 +228,20 @@ const ClassAdditionRequest: React.FC = () => {
     const handleSubmit = async () => {
         setSubmitting(true);
         setError('');
+        // Resolve the actual module name: use free-text if "Others" selected
+        const resolvedModule = form.module_name === 'Others'
+            ? form.module_name_other.trim()
+            : form.module_name;
         try {
-            await createClassAdditionRequest({ ...form, approver });
+            const payload = { ...form, module_name: resolvedModule, approver };
+            // Remove the helper field before sending
+            delete (payload as any).module_name_other;
+            await createClassAdditionRequest(payload);
             setSuccess('Class addition request submitted successfully!');
             setShowConfirm(false);
             setForm({
                 program: '', batch_name: '', class_title: '', module_name: '',
+                module_name_other: '',
                 date_of_class: '', time_of_class: '', class_type: 'Regular',
                 shift_other_classes: 'No',
                 assignment_requirement: 'None', reason: '', other_comments: '',
@@ -293,6 +307,15 @@ const ClassAdditionRequest: React.FC = () => {
                             placeholder="Select module..."
                             disabled={!form.batch_name}
                         />
+                        {form.module_name === 'Others' && (
+                            <input
+                                className="form-input"
+                                style={{ backgroundImage: 'none', marginTop: '8px' }}
+                                value={form.module_name_other}
+                                onChange={e => update('module_name_other', e.target.value)}
+                                placeholder="Please specify the module name"
+                            />
+                        )}
                     </div>
                     <div className="form-group">
                         <label className="form-label form-label-required">Class Title</label>

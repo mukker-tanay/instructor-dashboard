@@ -86,14 +86,6 @@ const Header: React.FC = () => {
                                     Admin
                                 </Link>
                             )}
-                            {user?.role === 'admin' && (
-                                <Link
-                                    to="/admin/metabase"
-                                    className={`nav-link ${isActive('/admin/metabase') ? 'active' : ''}`}
-                                >
-                                    Metabase
-                                </Link>
-                            )}
                         </nav>
                     </div>
 
@@ -131,6 +123,14 @@ const Header: React.FC = () => {
                                     style={{ display: 'block' }}
                                 >
                                     Policies
+                                </Link>
+                                <Link
+                                    to="/admin/metabase"
+                                    className="dropdown-item"
+                                    onClick={() => setShowDropdown(false)}
+                                    style={{ display: 'block' }}
+                                >
+                                    Metabase Queries
                                 </Link>
                                 <button className="dropdown-item danger" onClick={logout}>
                                     Sign Out
