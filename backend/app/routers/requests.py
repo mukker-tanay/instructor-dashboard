@@ -233,7 +233,6 @@ async def create_class_addition_request(
         "time_of_class":          body.time_of_class,
         "class_type":             body.class_type,
         "shift_other_classes":    body.shift_other_classes,
-        "contest_impact":         body.contest_impact,
         "assignment_requirement": body.assignment_requirement,
         "reason":                 body.reason,
         "other_comments":         body.other_comments or "",

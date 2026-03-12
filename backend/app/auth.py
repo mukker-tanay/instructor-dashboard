@@ -101,11 +101,8 @@ async def auth_callback(request: Request, code: str):
     email = userinfo.get("email", "")
     role = resolve_role(email)
 
-    # ---------------------------------------------------------
     # INSTRUCTOR ACCESS & ALIAS RESOLUTION
-    # ---------------------------------------------------------
     try:
-        # Check if this email is explicitly in the allowed list
         res = supabase.table("allowed_instructors").select("email, alias_email").eq("email", email.lower()).execute()
         
         if res.data:
@@ -122,7 +119,6 @@ async def auth_callback(request: Request, code: str):
     except Exception as e:
         logger.error(f"Failed to verify instructor access for {email}: {e}")
         raise HTTPException(status_code=500, detail="Error verifying access permissions")
-    # ---------------------------------------------------------
 
     user = UserInfo(
         email=email,
@@ -191,10 +187,8 @@ async def impersonate(request: Request):
                 target_email = alias.strip().lower()
     except Exception as e:
         logger.error(f"Failed to check alias during impersonation for {target_email}: {e}")
-    # ------------------------------------------
-
-    # Look up the real name from class data
-    real_name = target_email.split("@")[0]  # fallback
+    
+    real_name = target_email.split("@")[0] 
     try:
         res = supabase.table("classes").select("instructor_name").eq("instructor_email", target_email.lower()).limit(1).execute()
         if res.data and res.data[0].get("instructor_name"):
