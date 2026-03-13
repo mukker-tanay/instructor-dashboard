@@ -121,11 +121,8 @@ async def create_unavailability_request(
             "final_status": "",
             "replacement_instructor": "",
             "class_rating_in_case_of_replacement": "",
-            "ri_taking_the_class": "",
             "red_flag_proof": "",
             "status": "Pending",
-            "locked_by": "",
-            "locked_at": None,
             "pushed_to_sheet": False
         }
 
@@ -222,9 +219,6 @@ async def create_class_addition_request(
         "slack_link": "",
         "red_flag": "",
         "status": "Pending",
-        "locked_by": "",
-        "locked_at": None,
-        "rejection_reason": "",
         "pushed_to_sheet": False
     }
 

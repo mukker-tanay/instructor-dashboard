@@ -215,12 +215,9 @@ async def push_requests():
                 rec.get("final_status", ""),
                 rec.get("replacement_instructor", ""),
                 rec.get("class_rating_in_case_of_replacement", ""),
-                rec.get("ri_taking_the_class", ""),
                 rec.get("red_flag_proof", ""),
                 rec.get("id", ""), # request_id
-                rec.get("status", ""),
-                rec.get("locked_by", ""),
-                rec.get("locked_at", "")
+                rec.get("status", "")
             ]
             await asyncio.to_thread(sheets_service.append_row, UNAVAILABILITY_SHEET, row)
             supabase.table("unavailability_requests").update({"pushed_to_sheet": True}).eq("id", rec["id"]).execute()
@@ -244,7 +241,6 @@ async def push_requests():
                 rec.get("time_of_class", ""),
                 rec.get("class_type", ""),
                 rec.get("shift_other_classes_by_1", ""),
-                rec.get("contest_impact", ""),
                 rec.get("assignment_requirement", ""),
                 rec.get("reason_for_addition", ""),
                 rec.get("other_comments", ""),
@@ -257,10 +253,7 @@ async def push_requests():
                 rec.get("slack_link", ""),
                 rec.get("red_flag", ""),
                 rec.get("id", ""), # request_id
-                rec.get("status", ""),
-                rec.get("locked_by", ""),
-                rec.get("locked_at", ""),
-                rec.get("rejection_reason", "")
+                rec.get("status", "")
             ]
             await asyncio.to_thread(sheets_service.append_row, CLASS_ADDITION_SHEET, row)
             supabase.table("class_addition_requests").update({"pushed_to_sheet": True}).eq("id", rec["id"]).execute()
@@ -318,6 +311,67 @@ async def sync_deletions():
             logger.error(f"Deletion sync failed for '{sheet}': {e}")
 
 
+async def sync_replacement_ratings():
+    """Find unavailabilities with a replacement instructor where 48h has passed, and update the rating."""
+    logger.info("Syncing class ratings for past replacements...")
+    try:
+        # We need records where replacement_instructor is set, but rating is empty
+        res = supabase.table("unavailability_requests") \
+            .select("id, sbat_group_id, original_date_of_class") \
+            .neq("replacement_instructor", "") \
+            .eq("class_rating_in_case_of_replacement", "") \
+            .execute()
+        
+        records = res.data or []
+        if not records:
+            return
+
+        now = datetime.now(IST)
+        updates = []
+
+        # We'll batch fetch classes by SBAT to avoid looping N queries if possible.
+        sbat_ids = [r["sbat_group_id"] for r in records if r.get("sbat_group_id")]
+        if not sbat_ids:
+            return
+
+        # Fetch past classes that match these SBATs natively
+        classes_res = supabase.table("classes").select("sbat_group_id, class_rating").in_("sbat_group_id", sbat_ids).execute()
+        class_ratings = {c["sbat_group_id"]: c.get("class_rating", "") for c in (classes_res.data or []) if c.get("class_rating")}
+
+        for req in records:
+            # Parse the original_date_of_class safely (could be "13 March 2026" or "YYYY-MM-DD")
+            ds = req.get("original_date_of_class", "")
+            if not ds: continue
+            
+            # Simple heuristic: we just check if 48h has passed since the *day* of the class (using midnight)
+            raw_date = None
+            try:
+                # Try DD Month YYYY
+                if " " in ds:
+                    raw_date = datetime.strptime(ds, "%d %B %Y").replace(tzinfo=IST)
+                elif "-" in ds:
+                    raw_date = datetime.strptime(ds[:10], "%Y-%m-%d").replace(tzinfo=IST)
+            except Exception:
+                pass
+            
+            if raw_date and (now - raw_date) >= timedelta(hours=48):
+                sbat = req.get("sbat_group_id")
+                rating = class_ratings.get(sbat)
+                if rating:
+                    # Append strictly non-empty ratings
+                    updates.append({"id": req["id"], "class_rating_in_case_of_replacement": rating})
+
+        if updates:
+            # Supabase doesn't support bulk update with different values easily without upserting full rows, 
+            # so we update one by one for small batches.
+            for u in updates:
+                supabase.table("unavailability_requests").update({"class_rating_in_case_of_replacement": u["class_rating_in_case_of_replacement"]}).eq("id", u["id"]).execute()
+            logger.info(f"Updated {len(updates)} unavailabilities with replacement ratings.")
+
+    except Exception as e:
+        logger.error(f"Failed syncing replacement ratings: {e}")
+
+
 async def get_sync_status():
     """Returns the timestamp of the last successful sync from the classes table."""
     try:
@@ -337,4 +391,5 @@ async def run_full_sync():
     await pull_slack_data()
     await push_requests()
     await sync_deletions()
+    await sync_replacement_ratings()
     logger.info("--- SYNC ENGINE COMPLETED ---")
