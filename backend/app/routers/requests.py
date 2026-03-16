@@ -229,20 +229,8 @@ async def create_class_addition_request(
         raise HTTPException(status_code=500, detail="Database insertion failed")
 
     # --- Slack Workflow Notification ---
-    # Look up approver Slack ID from Supabase
-    def get_slack_id(name: str) -> str:
-        if not name:
-            return ""
-        try:
-            res = supabase.table("slack_members").select("id").ilike("name", f"%{name.strip()}%").limit(1).execute()
-            if res.data:
-                return str(res.data[0].get("id", "")).strip()
-        except Exception as e:
-            print(f"[ERROR] Slack member lookup failed: {e}")
-        return ""
-
-    # Only the first approver is used (the Workflow variable expects a single user ID)
-    approver_id = get_slack_id(body.approver) if body.approver else ""
+    # The frontend now passes the raw Slack ID directly in body.approver
+    approver_id = body.approver if body.approver else ""
 
     workflow_data = {
         "instructor_email":       user.email,

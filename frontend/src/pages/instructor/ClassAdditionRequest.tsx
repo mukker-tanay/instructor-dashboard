@@ -4,11 +4,11 @@ import type { BatchMeta } from '../../api/client';
 import Modal from '../../components/Modal';
 
 const APPROVER_OPTIONS = [
-    "Shivank Agrawal",
-    "Shubham Yadav",
-    "Vilas Varghese",
-    "Ayush Raj",
-    "Yogesh K"
+    { name: "Shivank Agrawal", id: "U035XV3G952" },
+    { name: "Yogesh Kumar", id: "U03HFGF2999" },
+    { name: "Vilas Varghese", id: "U0A9XSTAKU4" },
+    { name: "Shubham Yadav", id: "U08TAQE0A8H" },
+    { name: "Ayush Raj", id: "U066JHDP83W" },
 ];
 
 /* ─── Shared SearchableDropdown ─── */
@@ -400,8 +400,8 @@ const ClassAdditionRequest: React.FC = () => {
                     <label className="form-label form-label-required">Select Approver</label>
                     <select className="form-select" style={{ appearance: 'none' }} value={approver} onChange={e => setApprover(e.target.value)}>
                         <option value="">Select approver...</option>
-                        {APPROVER_OPTIONS.map(name => (
-                            <option key={name} value={name}>{name}</option>
+                        {APPROVER_OPTIONS.map(approverObj => (
+                            <option key={approverObj.id} value={approverObj.id}>{approverObj.name}</option>
                         ))}
                     </select>
                 </div>
@@ -430,7 +430,9 @@ const ClassAdditionRequest: React.FC = () => {
                     {approver && (
                         <div>
                             <span style={{ color: 'var(--text-muted)' }}>Approver: </span>
-                            <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{approver}</span>
+                            <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
+                                {APPROVER_OPTIONS.find(op => op.id === approver)?.name}
+                            </span>
                         </div>
                     )}
                 </div>
