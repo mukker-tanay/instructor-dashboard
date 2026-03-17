@@ -171,12 +171,6 @@ async def update_request_status(
         print(f"[ERROR] Failed to update request in Supabase: {e}")
         raise HTTPException(status_code=500, detail="Database update failed.")
 
-    fire_slack_notification(
-        f"✅ *Request {body.status.value}*\n"
-        f"• Request ID: {request_id}\n"
-        f"• By Admin: {admin.name} ({admin.email})"
-    )
-
     return {"message": f"Request {body.status.value.lower()} successfully."}
 
 
