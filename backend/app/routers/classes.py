@@ -119,20 +119,14 @@ async def get_batch_options(user: UserInfo = Depends(get_current_user)):
 
 @router.get("/instructors")
 async def get_instructor_options(user: UserInfo = Depends(get_current_user)):
-    """Get unique instructor names from upcoming classes (for replacement dropdown)."""
-    now = datetime.now(IST)
+    """Get unique instructor names from all classes (past + upcoming) for replacement dropdown."""
     instructors = set()
     try:
-        response = supabase.table("classes").select("instructor_name, class_date, time_of_day").eq("class_category", "upcoming").execute()
+        response = supabase.table("classes").select("instructor_name").execute()
         for c in (response.data or []):
-            parsed = parse_datetime(
-                str(c.get("class_date", "")),
-                str(c.get("time_of_day", "")),
-            )
-            if parsed >= now:
-                name = str(c.get("instructor_name", "")).strip()
-                if name and "scaler instructor" not in name.lower():
-                    instructors.add(name)
+            name = str(c.get("instructor_name", "")).strip()
+            if name and "scaler instructor" not in name.lower():
+                instructors.add(name)
     except Exception as e:
         print(f"[ERROR] Failed to fetch instructors: {e}")
     return {"instructors": sorted(instructors)}
