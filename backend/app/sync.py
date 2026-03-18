@@ -22,6 +22,18 @@ logger = logging.getLogger(__name__)
 IST = timezone(timedelta(hours=5, minutes=30))
 
 
+def _to_ist_str(ts: str) -> str:
+    """Convert a UTC ISO timestamp from Supabase to IST as M/D/YYYY H:MM:SS."""
+    if not ts:
+        return ""
+    try:
+        dt = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+        dt_ist = dt.astimezone(IST)
+        return f"{dt_ist.month}/{dt_ist.day}/{dt_ist.year} {dt_ist.hour}:{dt_ist.minute:02d}:{dt_ist.second:02d}"
+    except Exception:
+        return str(ts)  # fallback: return raw value
+
+
 def _generate_row_hash(row: Dict[str, Any]) -> str:
     """Generate a consistent hash from key class columns to identify uniqueness."""
     # We hash the combination of Instructor Email + Date + Time + Batch + Topic
@@ -220,7 +232,7 @@ async def push_requests():
                     rec.get("topics_and_promises", ""),
                     rec.get("batch_pulse_persona", ""),
                     rec.get("recommended_teaching_pace", ""),
-                    rec.get("raised_timestamp", ""),
+                    _to_ist_str(rec.get("raised_timestamp", "")),
                     rec.get("raised_by", ""),
                     rec.get("slack_thread_link", ""),
                     rec.get("final_status", ""),
@@ -271,7 +283,7 @@ async def push_requests():
                     rec.get("other_comments", ""),
                     rec.get("select_approver", ""),
                     rec.get("submitted_by", ""),
-                    rec.get("time_stamp", ""),
+                    _to_ist_str(rec.get("time_stamp", "")),
                     rec.get("slack_thread_link", ""),
                     rec.get("actual_date_of_class", ""),
                     rec.get("class_added_on_class_day", ""),
