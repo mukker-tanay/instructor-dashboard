@@ -153,6 +153,7 @@ class ClassAdditionRequestRow(BaseModel):
 class StatusUpdateRequest(BaseModel):
     status: RequestStatus
     payment_status: Optional[PaymentStatus] = None
+    class_added_on_class_day: Optional[str] = None
     red_flag: Optional[RedFlag] = None
     red_flag_reason: Optional[str] = None
     replacement_instructor: Optional[str] = None

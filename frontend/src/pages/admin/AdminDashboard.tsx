@@ -41,6 +41,7 @@ const AdminDashboard: React.FC = () => {
 
     // Class addition-specific fields
     const [paymentStatus, setPaymentStatus] = useState('Sanctioned');
+    const [classAddedOnDay, setClassAddedOnDay] = useState('');
     const [redFlag, setRedFlag] = useState('No');
     const [redFlagReason, setRedFlagReason] = useState('');
     const [paymentFilter, setPaymentFilter] = useState(false);
@@ -192,6 +193,7 @@ const AdminDashboard: React.FC = () => {
             setRedFlag(rf);
         } else {
             setPaymentStatus('Sanctioned');
+            setClassAddedOnDay('');
             setRedFlag('No');
             setRedFlagReason('');
             setRejectionReason('');
@@ -232,6 +234,7 @@ const AdminDashboard: React.FC = () => {
                     payload.red_flag_reason = redFlagProof || undefined;
                 } else {
                     payload.payment_status = paymentStatus as any;
+                    payload.class_added_on_class_day = classAddedOnDay || undefined;
                     payload.red_flag = redFlag as any;
                     payload.red_flag_reason = redFlag === 'Yes' ? redFlagReason : undefined;
                 }
@@ -524,6 +527,15 @@ const AdminDashboard: React.FC = () => {
                                                 <option value="Unpaid">Unpaid</option>
                                                 <option value="To be Audited">To be Audited</option>
                                                 <option value="Pending">Pending</option>
+                                            </select>
+                                        </div>
+
+                                        <div className="form-group">
+                                            <label className="form-label">Class Added On</label>
+                                            <select className="form-select" value={classAddedOnDay} onChange={e => setClassAddedOnDay(e.target.value)}>
+                                                <option value="">Not specified</option>
+                                                <option value="Class added on class day">Class added on class day</option>
+                                                <option value="Class added on non-class day">Class added on non-class day</option>
                                             </select>
                                         </div>
 

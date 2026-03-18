@@ -287,6 +287,7 @@ async def push_requests():
                     rec.get("slack_thread_link", ""),
                     rec.get("actual_date_of_class", ""),
                     rec.get("class_added_on_class_day", ""),
+                    rec.get("payment_status", ""),  # Payment Status — right after Class Added On
                     rec.get("slack_link", ""),
                     rec.get("red_flag", ""),
                     rec.get("id", ""),  # request_id
@@ -411,7 +412,10 @@ async def sync_replacement_ratings():
             # Supabase doesn't support bulk update with different values easily without upserting full rows, 
             # so we update one by one for small batches.
             for u in updates:
-                supabase.table("unavailability_requests").update({"class_rating_in_case_of_replacement": u["class_rating_in_case_of_replacement"]}).eq("id", u["id"]).execute()
+                supabase.table("unavailability_requests").update({
+                    "class_rating_in_case_of_replacement": u["class_rating_in_case_of_replacement"],
+                    "pushed_to_sheet": False,  # trigger re-sync to Google Sheets
+                }).eq("id", u["id"]).execute()
             logger.info(f"Updated {len(updates)} unavailabilities with replacement ratings.")
 
     except Exception as e:

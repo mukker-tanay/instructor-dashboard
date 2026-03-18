@@ -154,7 +154,9 @@ async def update_request_status(
 
     if req_type == "class_addition":
         if body.payment_status:
-            updates["class_added_on_class_day"] = body.payment_status.value
+            updates["payment_status"] = body.payment_status.value
+        if body.class_added_on_class_day is not None:
+            updates["class_added_on_class_day"] = body.class_added_on_class_day
         if body.red_flag:
             updates["red_flag"] = body.red_flag.value
             if body.red_flag.value == "Yes" and body.red_flag_reason:
