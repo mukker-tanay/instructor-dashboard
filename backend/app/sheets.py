@@ -205,6 +205,19 @@ class SheetsService:
             logger.error(f"Error appending row to '{sheet_name}': {e}")
             raise
 
+    def update_row(self, sheet_name: str, row_num: int, row_data: List[Any]) -> None:
+        """Overwrite an existing row in place (1-indexed, header = row 1)."""
+        try:
+            worksheet = self.spreadsheet.worksheet(sheet_name)
+            # Build range e.g. "A5:Z5" — wide enough to cover all columns
+            end_col = chr(ord('A') + len(row_data) - 1) if len(row_data) <= 26 else 'Z'
+            cell_range = f"A{row_num}:{end_col}{row_num}"
+            worksheet.update(cell_range, [row_data], value_input_option="USER_ENTERED")
+            logger.info(f"Updated row {row_num} in '{sheet_name}'.")
+        except Exception as e:
+            logger.error(f"Error updating row {row_num} in '{sheet_name}': {e}")
+            raise
+
     def find_row_by_value(self, sheet_name: str, col_index: int, value: str) -> Optional[int]:
         """Find the row number (1-indexed) where column col_index has the given value."""
         try:

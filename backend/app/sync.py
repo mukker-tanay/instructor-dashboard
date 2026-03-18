@@ -184,44 +184,64 @@ async def pull_slack_data():
 
 
 async def push_requests():
-    """Find requests in Supabase with pushed_to_sheet=False, append to Google Sheets, then mark True."""
+    """Find requests in Supabase with pushed_to_sheet=False, upsert to Google Sheets, then mark True.
+
+    For each record:
+      - If the Request ID already exists in the sheet → update that row in place.
+      - If not found → append a new row (first-time push).
+    This prevents duplicate rows when an admin approves/updates a request.
+    """
     logger.info("Starting request push from Supabase to Google Sheets...")
 
     # 1. Handle Unavailability
     try:
         unavail = supabase.table("unavailability_requests").select("*").eq("pushed_to_sheet", False).execute()
         records = unavail.data or []
-        for rec in records:
-            row = [
-                rec.get("instructor_email", ""),
-                rec.get("instructor_name", ""),
-                rec.get("program", ""),
-                rec.get("batch_name", ""),
-                rec.get("sbat_group_id", ""),
-                rec.get("module_name", ""),
-                rec.get("class_title", ""),
-                rec.get("original_date_of_class", ""),
-                rec.get("original_time_of_class", ""),
-                rec.get("class_type", ""),
-                rec.get("reason_for_unavailability", ""),
-                rec.get("any_other_comments", ""),
-                rec.get("suggested_instructors_for_replacement", ""),
-                rec.get("topics_and_promises", ""),
-                rec.get("batch_pulse_persona", ""),
-                rec.get("recommended_teaching_pace", ""),
-                rec.get("raised_timestamp", ""),
-                rec.get("raised_by", ""),
-                rec.get("slack_thread_link", ""),
-                rec.get("final_status", ""),
-                rec.get("replacement_instructor", ""),
-                rec.get("class_rating_in_case_of_replacement", ""),
-                rec.get("red_flag_proof", ""),
-                rec.get("id", ""), # request_id
-                rec.get("status", "")
-            ]
-            await asyncio.to_thread(sheets_service.append_row, UNAVAILABILITY_SHEET, row)
-            supabase.table("unavailability_requests").update({"pushed_to_sheet": True}).eq("id", rec["id"]).execute()
-            
+        if records:
+            # Fetch header indices once for the whole batch (1 API call per sync)
+            headers = await asyncio.to_thread(sheets_service.get_header_indices, UNAVAILABILITY_SHEET)
+            id_col = headers.get("Request ID") or headers.get("request_id")
+
+            for rec in records:
+                row = [
+                    rec.get("instructor_email", ""),
+                    rec.get("instructor_name", ""),
+                    rec.get("program", ""),
+                    rec.get("batch_name", ""),
+                    rec.get("sbat_group_id", ""),
+                    rec.get("module_name", ""),
+                    rec.get("class_title", ""),
+                    rec.get("original_date_of_class", ""),
+                    rec.get("original_time_of_class", ""),
+                    rec.get("class_type", ""),
+                    rec.get("reason_for_unavailability", ""),
+                    rec.get("any_other_comments", ""),
+                    rec.get("suggested_instructors_for_replacement", ""),
+                    rec.get("topics_and_promises", ""),
+                    rec.get("batch_pulse_persona", ""),
+                    rec.get("recommended_teaching_pace", ""),
+                    rec.get("raised_timestamp", ""),
+                    rec.get("raised_by", ""),
+                    rec.get("slack_thread_link", ""),
+                    rec.get("final_status", ""),
+                    rec.get("replacement_instructor", ""),
+                    rec.get("class_rating_in_case_of_replacement", ""),
+                    rec.get("red_flag_proof", ""),
+                    rec.get("id", ""),  # request_id
+                    rec.get("status", ""),
+                ]
+                request_id = rec.get("id", "")
+                existing_row = None
+                if id_col and request_id:
+                    existing_row = await asyncio.to_thread(
+                        sheets_service.find_row_by_value, UNAVAILABILITY_SHEET, id_col, request_id
+                    )
+                if existing_row:
+                    await asyncio.to_thread(sheets_service.update_row, UNAVAILABILITY_SHEET, existing_row, row)
+                else:
+                    await asyncio.to_thread(sheets_service.append_row, UNAVAILABILITY_SHEET, row)
+                supabase.table("unavailability_requests").update({"pushed_to_sheet": True}).eq("id", rec["id"]).execute()
+
     except Exception as e:
         logger.error(f"Failed pushing unavailability requests: {e}")
 
@@ -229,35 +249,49 @@ async def push_requests():
     try:
         class_add = supabase.table("class_addition_requests").select("*").eq("pushed_to_sheet", False).execute()
         records = class_add.data or []
-        for rec in records:
-            row = [
-                rec.get("instructor_email", ""),
-                rec.get("instructor_name", ""),
-                rec.get("program", ""),
-                rec.get("batch_name", ""),
-                rec.get("class_title", ""),
-                rec.get("module_name", ""),
-                rec.get("date_of_class", ""),
-                rec.get("time_of_class", ""),
-                rec.get("class_type", ""),
-                rec.get("shift_other_classes_by_1", ""),
-                rec.get("assignment_requirement", ""),
-                rec.get("reason_for_addition", ""),
-                rec.get("other_comments", ""),
-                rec.get("select_approver", ""),
-                rec.get("submitted_by", ""),
-                rec.get("time_stamp", ""),
-                rec.get("slack_thread_link", ""),
-                rec.get("actual_date_of_class", ""),
-                rec.get("class_added_on_class_day", ""),
-                rec.get("slack_link", ""),
-                rec.get("red_flag", ""),
-                rec.get("id", ""), # request_id
-                rec.get("status", "")
-            ]
-            await asyncio.to_thread(sheets_service.append_row, CLASS_ADDITION_SHEET, row)
-            supabase.table("class_addition_requests").update({"pushed_to_sheet": True}).eq("id", rec["id"]).execute()
-            
+        if records:
+            # Fetch header indices once for the whole batch (1 API call per sync)
+            headers = await asyncio.to_thread(sheets_service.get_header_indices, CLASS_ADDITION_SHEET)
+            id_col = headers.get("Request ID") or headers.get("request_id")
+
+            for rec in records:
+                row = [
+                    rec.get("instructor_email", ""),
+                    rec.get("instructor_name", ""),
+                    rec.get("program", ""),
+                    rec.get("batch_name", ""),
+                    rec.get("class_title", ""),
+                    rec.get("module_name", ""),
+                    rec.get("date_of_class", ""),
+                    rec.get("time_of_class", ""),
+                    rec.get("class_type", ""),
+                    rec.get("shift_other_classes_by_1", ""),
+                    rec.get("assignment_requirement", ""),
+                    rec.get("reason_for_addition", ""),
+                    rec.get("other_comments", ""),
+                    rec.get("select_approver", ""),
+                    rec.get("submitted_by", ""),
+                    rec.get("time_stamp", ""),
+                    rec.get("slack_thread_link", ""),
+                    rec.get("actual_date_of_class", ""),
+                    rec.get("class_added_on_class_day", ""),
+                    rec.get("slack_link", ""),
+                    rec.get("red_flag", ""),
+                    rec.get("id", ""),  # request_id
+                    rec.get("status", ""),
+                ]
+                request_id = rec.get("id", "")
+                existing_row = None
+                if id_col and request_id:
+                    existing_row = await asyncio.to_thread(
+                        sheets_service.find_row_by_value, CLASS_ADDITION_SHEET, id_col, request_id
+                    )
+                if existing_row:
+                    await asyncio.to_thread(sheets_service.update_row, CLASS_ADDITION_SHEET, existing_row, row)
+                else:
+                    await asyncio.to_thread(sheets_service.append_row, CLASS_ADDITION_SHEET, row)
+                supabase.table("class_addition_requests").update({"pushed_to_sheet": True}).eq("id", rec["id"]).execute()
+
     except Exception as e:
         logger.error(f"Failed pushing class addition requests: {e}")
 

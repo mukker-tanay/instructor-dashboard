@@ -292,9 +292,8 @@ const AdminDashboard: React.FC = () => {
                             className={`btn btn-sm ${paymentFilter ? 'btn-primary' : 'btn-secondary'}`}
                             onClick={() => { setPaymentFilter(p => !p); setFilter('all'); setTypeFilter('all'); }}
                             style={{ marginLeft: 'auto', whiteSpace: 'nowrap' }}
-                            title="Show Approved class addition requests with Pending or To be Audited payment status"
                         >
-                            {paymentFilter ? '⚠ Needs Attention ✕' : '⚠ Needs Attention'}
+                            {paymentFilter ? 'Pending Payment Status ✕' : 'Pending Payment Status'}
                         </button>
                     </div>
 
