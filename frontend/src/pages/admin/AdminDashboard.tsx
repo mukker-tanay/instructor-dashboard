@@ -64,7 +64,7 @@ const AdminDashboard: React.FC = () => {
         ? requests.filter(r =>
             r.request_type === 'class_addition' &&
             String(r.status || r.Status || '').trim() === 'Approved' &&
-            ['Pending', 'To be Audited'].includes(String(r.class_added_on_class_day || '').trim())
+            ['Pending', 'To be Audited'].includes(String(r.payment_status || '').trim())
         )
         : requests;
 
