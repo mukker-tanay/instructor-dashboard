@@ -91,7 +91,7 @@ export interface RequestsResponse {
 
 export interface StatusUpdate {
     status: 'Approved' | 'Rejected';
-    payment_status?: 'Sanctioned' | 'Non-sanctioned' | 'Unpaid';
+    payment_status?: 'Sanctioned' | 'Non-sanctioned' | 'Unpaid' | 'To be Audited' | 'Pending';
     red_flag?: 'Yes' | 'No';
     red_flag_reason?: string;
     replacement_instructor?: string;

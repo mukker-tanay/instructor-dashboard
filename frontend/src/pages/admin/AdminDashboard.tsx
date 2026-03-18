@@ -43,6 +43,7 @@ const AdminDashboard: React.FC = () => {
     const [paymentStatus, setPaymentStatus] = useState('Sanctioned');
     const [redFlag, setRedFlag] = useState('No');
     const [redFlagReason, setRedFlagReason] = useState('');
+    const [paymentFilter, setPaymentFilter] = useState(false);
     const [rejectionReason, setRejectionReason] = useState('');
 
     const fetchRequests = useCallback(async () => {
@@ -57,6 +58,14 @@ const AdminDashboard: React.FC = () => {
             setSelectedIds(new Set()); // Clear selection on refresh
         }
     }, [filter, typeFilter]);
+
+    const displayedRequests = paymentFilter
+        ? requests.filter(r =>
+            r.request_type === 'class_addition' &&
+            String(r.status || r.Status || '').trim() === 'Approved' &&
+            ['Pending', 'To be Audited'].includes(String(r.class_added_on_class_day || '').trim())
+        )
+        : requests;
 
     const fetchInstructors = useCallback(async () => {
         setAccessLoading(true);
@@ -271,18 +280,26 @@ const AdminDashboard: React.FC = () => {
                     {/* Filters + Bulk Actions */}
                     <div className="filters-bar" style={{ flexWrap: 'wrap', gap: 'var(--space-sm)' }}>
                         <div className="tabs" style={{ margin: 0 }}>
-                            <button className={`tab ${filter === 'Pending' ? 'active' : ''}`} onClick={() => setFilter('Pending')}>Pending</button>
-                            <button className={`tab ${filter === 'all' ? 'active' : ''}`} onClick={() => setFilter('all')}>All</button>
+                            <button className={`tab ${filter === 'Pending' ? 'active' : ''}`} onClick={() => { setFilter('Pending'); setPaymentFilter(false); }}>Pending</button>
+                            <button className={`tab ${filter === 'all' ? 'active' : ''}`} onClick={() => { setFilter('all'); setPaymentFilter(false); }}>All</button>
                         </div>
                         <div className="tabs" style={{ margin: 0 }}>
                             <button className={`tab ${typeFilter === 'all' ? 'active' : ''}`} onClick={() => setTypeFilter('all')}>All Types</button>
                             <button className={`tab ${typeFilter === 'unavailability' ? 'active' : ''}`} onClick={() => setTypeFilter('unavailability')}>Unavailability</button>
                             <button className={`tab ${typeFilter === 'class_addition' ? 'active' : ''}`} onClick={() => setTypeFilter('class_addition')}>Class Addition</button>
                         </div>
+                        <button
+                            className={`btn btn-sm ${paymentFilter ? 'btn-primary' : 'btn-secondary'}`}
+                            onClick={() => { setPaymentFilter(p => !p); setFilter('all'); setTypeFilter('all'); }}
+                            style={{ marginLeft: 'auto', whiteSpace: 'nowrap' }}
+                            title="Show Approved class addition requests with Pending or To be Audited payment status"
+                        >
+                            {paymentFilter ? '⚠ Needs Attention ✕' : '⚠ Needs Attention'}
+                        </button>
                     </div>
 
                     {/* Bulk action bar — visible when requests exist */}
-                    {!loading && requests.length > 0 && (
+                    {!loading && displayedRequests.length > 0 && (
                         <div style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -322,13 +339,13 @@ const AdminDashboard: React.FC = () => {
 
                     {loading ? (
                         <div className="loading-container"><div className="spinner" /></div>
-                    ) : requests.length === 0 ? (
+                    ) : displayedRequests.length === 0 ? (
                         <div className="empty-state">
                             <div className="empty-state-icon">—</div>
-                            <p className="empty-state-text">No {filter === 'Pending' ? 'pending ' : ''}requests.</p>
+                            <p className="empty-state-text">{paymentFilter ? 'No requests needing attention.' : `No ${filter === 'Pending' ? 'pending ' : ''}requests.`}</p>
                         </div>
                     ) : (
-                        requests.map((r, i) => {
+                        displayedRequests.map((r, i) => {
                             const rid = getRequestId(r);
                             const status = getStatus(r);
                             const isUnavail = r.request_type === 'unavailability';
@@ -507,6 +524,7 @@ const AdminDashboard: React.FC = () => {
                                                 <option value="Non-sanctioned">Non-sanctioned</option>
                                                 <option value="Unpaid">Unpaid</option>
                                                 <option value="To be Audited">To be Audited</option>
+                                                <option value="Pending">Pending</option>
                                             </select>
                                         </div>
 

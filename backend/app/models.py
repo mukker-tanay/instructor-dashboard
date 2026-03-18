@@ -25,6 +25,7 @@ class PaymentStatus(str, Enum):
     NON_SANCTIONED = "Non-sanctioned"
     UNPAID = "Unpaid"
     TO_BE_AUDITED = "To be Audited"
+    PENDING = "Pending"
 
 
 class RedFlag(str, Enum):
