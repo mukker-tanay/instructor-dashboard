@@ -289,9 +289,9 @@ const AdminDashboard: React.FC = () => {
                             <button className={`tab ${typeFilter === 'class_addition' ? 'active' : ''}`} onClick={() => setTypeFilter('class_addition')}>Class Addition</button>
                         </div>
                         <button
-                            className={`btn btn-sm ${paymentFilter ? 'btn-primary' : 'btn-secondary'}`}
+                            className="btn btn-danger btn-sm"
                             onClick={() => { setPaymentFilter(p => !p); setFilter('all'); setTypeFilter('all'); }}
-                            style={{ marginLeft: 'auto', whiteSpace: 'nowrap' }}
+                            style={{ marginLeft: 'auto', whiteSpace: 'nowrap', opacity: paymentFilter ? 1 : 0.75 }}
                         >
                             {paymentFilter ? 'Pending Payment Status ✕' : 'Pending Payment Status'}
                         </button>
