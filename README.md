@@ -29,9 +29,9 @@ A comprehensive management tool for instructors to track classes, raise requests
 
 ```mermaid
 graph LR
-    User[Instructor/Admin] -->|HTTPS| Frontend[React SPA\n(Vercel)]
-    Frontend -->|/api/*| Backend[FastAPI\n(Vercel Function)]
-    Backend -->|Read/Write| Supabase[(Supabase\nPostgres)]
+    User[Instructor/Admin] -->|HTTPS| Frontend[React SPA on Vercel]
+    Frontend -->|/api/*| Backend[FastAPI on Vercel]
+    Backend -->|Read/Write| Supabase[(Supabase Postgres)]
     Backend -->|Bookkeeping Sync| GSheets[Google Sheets]
     Backend -->|Workflow Webhooks| Slack[Slack Workflow Builder]
 ```
