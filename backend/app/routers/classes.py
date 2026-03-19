@@ -155,7 +155,9 @@ async def get_batch_metadata(user: UserInfo = Depends(get_current_user)):
         if batch and program:
             batch_programs[batch] = program
 
-    # 2. Second pass: instructor's batches + upcoming modules
+    # 2. Second pass: instructor's batches + upcoming modules + last past class module
+    last_past: dict = {}  # batch -> (parsed_dt, module_name) of the most recent past class
+
     for c in all_classes:
         if str(c.get("instructor_email", "")).strip().lower() != email:
             continue
@@ -166,15 +168,28 @@ async def get_batch_metadata(user: UserInfo = Depends(get_current_user)):
             meta[batch] = {"program": batch_programs.get(batch, ""), "modules": set()}
         date_str = str(c.get("class_date", "")).strip()
         time_str = str(c.get("time_of_day", "")).strip()
-        if date_str and parse_datetime(date_str, time_str) >= now:
-            mod = str(c.get("module_name", "")).strip()
+        if not date_str:
+            continue
+        parsed_dt = parse_datetime(date_str, time_str)
+        mod = str(c.get("module_name", "")).strip()
+        if parsed_dt >= now:
+            # Upcoming class — add module directly
             if mod:
                 meta[batch]["modules"].add(mod)
+        else:
+            # Past class — track the most recent one per batch
+            if mod and (batch not in last_past or parsed_dt > last_past[batch][0]):
+                last_past[batch] = (parsed_dt, mod)
+
+    # Include the most recent past class's module for each batch
+    for batch, (_, mod) in last_past.items():
+        if batch in meta and mod:
+            meta[batch]["modules"].add(mod)
 
     result = {
         batch: {"program": info["program"], "modules": sorted(info["modules"])}
         for batch, info in meta.items()
-        if info["modules"]  # only include batches with at least one upcoming module
+        if info["modules"]  # only include batches with at least one upcoming or last-past module
     }
     return {"batch_metadata": result}
 
