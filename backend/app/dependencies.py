@@ -34,6 +34,7 @@ async def get_current_user(request: Request) -> UserInfo:
             name=impersonate_email.split("@")[0],
             picture="",
             role=imp_role,
+            raised_by_email=real_user.email,  # Track which admin actually submitted
         )
 
     return real_user

@@ -170,3 +170,4 @@ class UserInfo(BaseModel):
     name: str
     picture: str = ""
     role: str = "instructor"  # "instructor" or "admin"
+    raised_by_email: str = ""  # Admin email if impersonating, else falls back to email
