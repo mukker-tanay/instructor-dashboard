@@ -181,10 +181,10 @@ async def get_batch_metadata(user: UserInfo = Depends(get_current_user)):
             if mod and (batch not in last_past or parsed_dt > last_past[batch][0]):
                 last_past[batch] = (parsed_dt, mod)
 
-    # Include the most recent past class's module for each batch if within the last 1 week
-    one_week_ago = now - timedelta(days=7)
+    # Include the most recent past class's module for each batch if within the last 10 days
+    limit_date = now - timedelta(days=10)
     for batch, (dt, mod) in last_past.items():
-        if batch in meta and mod and dt >= one_week_ago:
+        if batch in meta and mod and dt >= limit_date:
             meta[batch]["modules"].add(mod)
 
     result = {
