@@ -140,8 +140,8 @@ async def get_batch_metadata(user: UserInfo = Depends(get_current_user)):
     meta: dict = {}
 
     try:
-        # Single query: all classes (global) to build batch->program map + instructor's classes for modules
-        resp = supabase.table("classes").select("instructor_email,sb_names,program,module_name,class_date,time_of_day").execute()
+        # Single query: instructor's classes to build batch->program map + upcoming/past modules
+        resp = supabase.table("classes").select("instructor_email,sb_names,program,module_name,class_date,time_of_day").eq("instructor_email", email).execute()
         all_classes = resp.data or []
     except Exception as e:
         print(f"[ERROR] batch-metadata supabase error: {e}")
