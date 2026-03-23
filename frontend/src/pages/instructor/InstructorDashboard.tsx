@@ -316,10 +316,8 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
     // Only batches that have upcoming modules (from getBatchMetadata) + 'Others'
     const batchDropdownOptions = [...Object.keys(batchMeta).sort(), 'Others'];
 
-    // Unique program names for the program dropdown (used when batch = Others)
-    const programOptions = [...new Set(
-        Object.values(batchMeta).map(m => m.program).filter(Boolean)
-    )].sort();
+    // the program dropdown (used when batch = Others)
+    const programOptions = ['Academy', 'AIML', 'DSML', 'Devops'];
 
     /* Format YYYY-MM-DD → DD/MM/YYYY for display */
     const formatDateDisplay = (val: string) => {
