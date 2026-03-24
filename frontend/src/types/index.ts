@@ -4,7 +4,7 @@ export interface User {
     email: string;
     name: string;
     picture: string;
-    role: 'instructor' | 'admin';
+    role: 'instructor' | 'admin' | 'loco';
 }
 
 export interface ClassItem {
