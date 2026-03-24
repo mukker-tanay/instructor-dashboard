@@ -118,8 +118,8 @@ async def auth_callback(request: Request, code: str):
             if alias:
                 email = alias.strip().lower()
         else:
-            # If not in the allowed list, reject them UNLESS they are an admin
-            if role != "admin":
+            # If not in the allowed list, reject them UNLESS they are an admin or loco
+            if role not in ["admin", "loco"]:
                 logger.warning(f"Blocked unauthorized login attempt from: {email}")
                 redirect_target = f"{settings.frontend_url.rstrip('/')}/?error=unauthorized"
                 return RedirectResponse(url=redirect_target)
