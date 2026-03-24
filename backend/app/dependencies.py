@@ -23,18 +23,23 @@ async def get_current_user(request: Request) -> UserInfo:
         role=payload.get("role", "instructor"),
     )
 
-    # Admin impersonation
+    # Impersonation (Admin or Loco)
     impersonate_email = request.headers.get("X-Impersonate", "").strip()
     if impersonate_email:
-        if real_user.role != "admin":
-            raise HTTPException(status_code=403, detail="Only admins can impersonate")
-        imp_role = "admin" if impersonate_email.lower() in settings.admin_email_list else "instructor"
+        if real_user.role not in ["admin", "loco"]:
+            raise HTTPException(status_code=403, detail="Only admins and loco team can impersonate")
+            
+        target_is_admin = impersonate_email.lower() in settings.admin_email_list
+        if real_user.role == "loco" and target_is_admin:
+            raise HTTPException(status_code=403, detail="Loco team cannot impersonate admins")
+
+        imp_role = "admin" if target_is_admin else "instructor"
         return UserInfo(
             email=impersonate_email,
             name=impersonate_email.split("@")[0],
             picture="",
             role=imp_role,
-            raised_by_email=real_user.email,  # Track which admin actually submitted
+            raised_by_email=real_user.email,  # Track who actually submitted
         )
 
     return real_user

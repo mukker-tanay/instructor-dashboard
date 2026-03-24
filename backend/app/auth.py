@@ -42,6 +42,13 @@ def decode_jwt(token: str) -> dict:
 def resolve_role(email: str) -> str:
     if email.lower() in settings.admin_email_list:
         return "admin"
+    from app.supabase_client import supabase
+    try:
+        res = supabase.table("loco_users").select("email").eq("email", email.lower()).execute()
+        if res.data:
+            return "loco"
+    except Exception as e:
+        logger.error(f"Failed to check loco role for {email}: {e}")
     return "instructor"
 
 
@@ -168,13 +175,17 @@ async def impersonate(request: Request):
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     payload = decode_jwt(token)
-    if payload.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
+    if payload.get("role") not in ["admin", "loco"]:
+        raise HTTPException(status_code=403, detail="Admin or loco access required")
 
     body = await request.json()
     target_email = body.get("email", "").strip()
     if not target_email:
         raise HTTPException(status_code=400, detail="Email is required")
+        
+    target_is_admin = target_email.lower() in settings.admin_email_list
+    if payload.get("role") == "loco" and target_is_admin:
+        raise HTTPException(status_code=403, detail="Loco team cannot impersonate admins")
 
     from app.supabase_client import supabase
     
