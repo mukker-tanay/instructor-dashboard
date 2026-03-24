@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getAdminRequests, updateRequestStatus, getInstructorOptions, deleteRequests, getAllowedInstructors, addAllowedInstructor, removeAllowedInstructor, updateAllowedInstructorAlias } from '../../api/client';
+import { getAdminRequests, updateRequestStatus, getInstructorOptions, deleteRequests, getAllowedInstructors, addAllowedInstructor, removeAllowedInstructor, updateAllowedInstructorAlias, getLocoUsers, addLocoUser, removeLocoUser } from '../../api/client';
 import type { RequestItem, StatusUpdate } from '../../types';
 import Modal from '../../components/Modal';
 
@@ -12,13 +12,19 @@ const AdminDashboard: React.FC = () => {
     const [showModal, setShowModal] = useState(false);
 
     // Top-level navigation
-    const [activeView, setActiveView] = useState<'requests' | 'access'>('requests');
+    const [activeView, setActiveView] = useState<'requests' | 'access' | 'loco'>('requests');
 
     // Access Control state
     const [instructors, setInstructors] = useState<{ email: string; added_by?: string; added_at?: string; alias_email?: string }[]>([]);
     const [newInstructorEmail, setNewInstructorEmail] = useState('');
     const [instructorSearch, setInstructorSearch] = useState('');
     const [accessLoading, setAccessLoading] = useState(false);
+
+    // Loco Control state
+    const [locoUsers, setLocoUsers] = useState<{ email: string }[]>([]);
+    const [newLocoEmail, setNewLocoEmail] = useState('');
+    const [locoSearch, setLocoSearch] = useState('');
+    const [locoLoading, setLocoLoading] = useState(false);
 
     // Alias Modal State
     const [aliasModalEmail, setAliasModalEmail] = useState<string | null>(null);
@@ -80,13 +86,27 @@ const AdminDashboard: React.FC = () => {
         }
     }, []);
 
+    const fetchLocoUsers = useCallback(async () => {
+        setLocoLoading(true);
+        try {
+            const data = await getLocoUsers();
+            setLocoUsers(data.loco_users);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLocoLoading(false);
+        }
+    }, []);
+
     useEffect(() => {
         if (activeView === 'requests') {
             fetchRequests();
-        } else {
+        } else if (activeView === 'access') {
             fetchInstructors();
+        } else if (activeView === 'loco') {
+            fetchLocoUsers();
         }
-    }, [activeView, fetchRequests, fetchInstructors]);
+    }, [activeView, fetchRequests, fetchInstructors, fetchLocoUsers]);
 
     // --- Access Control Handlers ---
     const handleAddInstructor = async (e: React.FormEvent) => {
@@ -137,6 +157,37 @@ const AdminDashboard: React.FC = () => {
     const filteredInstructors = instructors.filter(i =>
         i.email.toLowerCase().includes(instructorSearch.toLowerCase()) ||
         (i.alias_email && i.alias_email.toLowerCase().includes(instructorSearch.toLowerCase()))
+    );
+
+    // --- Loco Handlers ---
+    const handleAddLoco = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newLocoEmail.trim()) return;
+        try {
+            const emails = newLocoEmail.split(/[\s,]+/).map(em => em.trim()).filter(Boolean);
+            if (emails.length === 0) return;
+            for (const em of emails) {
+                await addLocoUser(em);
+            }
+            setNewLocoEmail('');
+            fetchLocoUsers();
+        } catch (err: any) {
+            alert(err?.response?.data?.detail || 'Failed to add loco user(s)');
+        }
+    };
+
+    const handleRemoveLoco = async (email: string) => {
+        if (!window.confirm(`Are you sure you want to revoke Loco dashboard access for ${email}?`)) return;
+        try {
+            await removeLocoUser(email);
+            fetchLocoUsers();
+        } catch (err: any) {
+            alert(err?.response?.data?.detail || 'Failed to remove loco user');
+        }
+    };
+
+    const filteredLocoUsers = locoUsers.filter(u =>
+        u.email.toLowerCase().includes(locoSearch.toLowerCase())
     );
 
     // --- Selection helpers ---
@@ -275,6 +326,7 @@ const AdminDashboard: React.FC = () => {
                 <div className="tabs" style={{ margin: 0, flexShrink: 0 }}>
                     <button className={`tab ${activeView === 'requests' ? 'active' : ''}`} onClick={() => setActiveView('requests')}>Requests</button>
                     <button className={`tab ${activeView === 'access' ? 'active' : ''}`} onClick={() => setActiveView('access')}>Access Control</button>
+                    <button className={`tab ${activeView === 'loco' ? 'active' : ''}`} onClick={() => setActiveView('loco')}>Loco Team</button>
                 </div>
             </div>
 
@@ -582,7 +634,7 @@ const AdminDashboard: React.FC = () => {
                         )}
                     </Modal>
                 </>
-            ) : (
+            ) : activeView === 'access' ? (
                 /* --- Access Control View --- */
                 <div style={{ marginTop: '20px' }}>
                     <div className="card" style={{ padding: '24px', marginBottom: '24px' }}>
@@ -670,7 +722,70 @@ const AdminDashboard: React.FC = () => {
                         )}
                     </div>
                 </div>
-            )}
+            ) : activeView === 'loco' ? (
+                /* --- Loco Control View --- */
+                <div style={{ marginTop: '20px' }}>
+                    <div className="card" style={{ padding: '24px', marginBottom: '24px' }}>
+                        <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '8px' }}>Grant Loco Team Access</h2>
+                        <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '16px' }}>
+                            Loco Team members can impersonate any instructor to manage their classes, without having full admin access.
+                        </p>
+                        <form onSubmit={handleAddLoco} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                            <input
+                                type="text"
+                                className="form-input"
+                                placeholder="name1@scaler.com, name2@scaler.com..."
+                                value={newLocoEmail}
+                                onChange={e => setNewLocoEmail(e.target.value)}
+                                style={{ flex: '1 1 220px', minWidth: 0 }}
+                                required
+                            />
+                            <button type="submit" className="btn btn-primary" style={{ flexShrink: 0 }}>
+                                Give Access
+                            </button>
+                        </form>
+                    </div>
+
+                    <div className="card">
+                        <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                            <h3 style={{ fontSize: '1rem', fontWeight: 600, margin: 0 }}>Loco Team ({filteredLocoUsers.length})</h3>
+                            <input
+                                type="text"
+                                className="form-input"
+                                placeholder="Search emails..."
+                                value={locoSearch}
+                                onChange={e => setLocoSearch(e.target.value)}
+                                style={{ width: '220px', maxWidth: '100%', padding: '6px 12px', fontSize: '0.875rem' }}
+                            />
+                        </div>
+                        {locoLoading ? (
+                            <div className="loading-container"><div className="spinner" /></div>
+                        ) : locoUsers.length === 0 ? (
+                            <div className="empty-state" style={{ padding: '40px' }}>
+                                <p className="empty-state-text">No Loco Team members added yet.</p>
+                            </div>
+                        ) : filteredLocoUsers.length === 0 ? (
+                            <div className="empty-state" style={{ padding: '40px' }}>
+                                <p className="empty-state-text">No users matching "{locoSearch}".</p>
+                            </div>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                {filteredLocoUsers.map(user => (
+                                    <div key={user.email} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', borderBottom: '1px solid var(--border)', fontSize: '0.875rem' }}>
+                                        <div style={{ fontWeight: 500 }}>{user.email}</div>
+                                        <button
+                                            className="btn btn-danger btn-sm"
+                                            onClick={() => handleRemoveLoco(user.email)}
+                                        >
+                                            Revoke
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            ) : null}
 
             {/* Alias Modal */}
             <Modal

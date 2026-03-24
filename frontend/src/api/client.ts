@@ -78,6 +78,16 @@ export const updateAllowedInstructorAlias = (email: string, alias_email: string)
 export const removeAllowedInstructor = (email: string) =>
     api.delete<{ message: string }>(`/admin/instructors?email=${encodeURIComponent(email)}`).then(r => r.data);
 
+/* ── Loco Team ── */
+export const getLocoUsers = () =>
+    api.get<{ loco_users: { email: string }[] }>('/admin/loco').then(r => r.data);
+
+export const addLocoUser = (email: string) =>
+    api.post<{ message: string }>('/admin/loco', { email }).then(r => r.data);
+
+export const removeLocoUser = (email: string) =>
+    api.delete<{ message: string }>(`/admin/loco?email=${encodeURIComponent(email)}`).then(r => r.data);
+
 /* ── Health ── */
 export const healthCheck = () => api.get('/health').then(r => r.data);
 

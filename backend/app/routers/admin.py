@@ -291,3 +291,51 @@ async def remove_allowed_instructor(
     except Exception as e:
         logger.error(f"Failed to remove allowed instructor {email}: {e}")
         raise HTTPException(status_code=500, detail="Failed to remove instructor")
+
+
+# -------------------------------------------------------------------
+# LOCO TEAM ACCESS CONTROL
+# -------------------------------------------------------------------
+
+class LocoUserCreate(BaseModel):
+    email: str
+
+@router.get("/loco")
+async def get_loco_users(admin: UserInfo = Depends(require_admin)):
+    """Get all loco team members."""
+    try:
+        res = supabase.table("loco_users").select("*").execute()
+        return {"loco_users": res.data or []}
+    except Exception as e:
+        logger.error(f"Failed to fetch loco users: {e}")
+        raise HTTPException(status_code=500, detail="Database lookup failed")
+
+@router.post("/loco")
+async def add_loco_user(
+    body: LocoUserCreate,
+    admin: UserInfo = Depends(require_admin)
+):
+    """Grant loco access to an email."""
+    email = body.email.strip().lower()
+    if not email:
+        raise HTTPException(status_code=400, detail="Valid email is required")
+
+    try:
+        supabase.table("loco_users").upsert([{"email": email}]).execute()
+        return {"message": f"Successfully granted loco access to {email}"}
+    except Exception as e:
+        logger.error(f"Failed to add loco user {email}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to add loco user")
+
+@router.delete("/loco")
+async def remove_loco_user(
+    email: str,
+    admin: UserInfo = Depends(require_admin)
+):
+    """Revoke loco access for an email."""
+    try:
+        supabase.table("loco_users").delete().eq("email", email.lower()).execute()
+        return {"message": f"Successfully revoked loco access for {email}"}
+    except Exception as e:
+        logger.error(f"Failed to remove loco user {email}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to remove loco user")
