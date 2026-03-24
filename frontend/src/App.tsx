@@ -13,6 +13,7 @@ import PoliciesPage from './pages/instructor/PoliciesPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import ImpersonateRoute from './pages/admin/ImpersonateRoute';
 import MetabaseQueries from './pages/admin/MetabaseQueries';
+import LocoDashboard from './pages/loco/LocoDashboard';
 
 const queryClient = new QueryClient({
     defaultOptions: {
@@ -51,9 +52,16 @@ const LoginPage: React.FC = () => {
 };
 
 /* ── Protected route wrapper ── */
-const ProtectedRoute: React.FC<{ children: React.ReactNode; adminOnly?: boolean }> = ({
+const ProtectedRoute: React.FC<{
+    children: React.ReactNode;
+    adminOnly?: boolean;
+    requireLoco?: boolean;
+    blockLoco?: boolean;
+}> = ({
     children,
     adminOnly,
+    requireLoco,
+    blockLoco,
 }) => {
     const { user, loading, isAdmin } = useAuth();
 
@@ -65,7 +73,12 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; adminOnly?: boolean 
         );
     }
     if (!user) return <Navigate to="/" replace />;
-    if (adminOnly && !isAdmin) return <Navigate to="/instructor/dashboard" replace />;
+    
+    const isLoco = user.role === 'loco';
+
+    if (adminOnly && !isAdmin) return <Navigate to={isLoco ? "/loco/dashboard" : "/instructor/dashboard"} replace />;
+    if (requireLoco && !isLoco) return <Navigate to="/instructor/dashboard" replace />;
+    if (blockLoco && isLoco) return <Navigate to="/loco/dashboard" replace />;
 
     return <>{children}</>;
 };
@@ -93,20 +106,27 @@ const AppContent: React.FC = () => {
 
     return (
         <Routes>
-            <Route path="/" element={user ? <Navigate to="/instructor/dashboard" replace /> : <LoginPage />} />
+            <Route path="/" element={
+                 user ? (user.role === 'loco' ? <Navigate to="/loco/dashboard" replace /> : <Navigate to="/instructor/dashboard" replace />) : <LoginPage />
+            } />
 
             {/* Instructor routes */}
             <Route path="/instructor/dashboard" element={
-                <ProtectedRoute><AppLayout><InstructorDashboard /></AppLayout></ProtectedRoute>
+                <ProtectedRoute blockLoco><AppLayout><InstructorDashboard /></AppLayout></ProtectedRoute>
             } />
             <Route path="/instructor/my-requests" element={
-                <ProtectedRoute><AppLayout><MyRequests /></AppLayout></ProtectedRoute>
+                <ProtectedRoute blockLoco><AppLayout><MyRequests /></AppLayout></ProtectedRoute>
             } />
             <Route path="/instructor/my-batches" element={
-                <ProtectedRoute><AppLayout><MyBatches /></AppLayout></ProtectedRoute>
+                <ProtectedRoute blockLoco><AppLayout><MyBatches /></AppLayout></ProtectedRoute>
             } />
             <Route path="/instructor/policies" element={
-                <ProtectedRoute><AppLayout><PoliciesPage /></AppLayout></ProtectedRoute>
+                <ProtectedRoute blockLoco><AppLayout><PoliciesPage /></AppLayout></ProtectedRoute>
+            } />
+
+            {/* Loco route */}
+            <Route path="/loco/dashboard" element={
+                <ProtectedRoute requireLoco><AppLayout><LocoDashboard /></AppLayout></ProtectedRoute>
             } />
 
             {/* Admin routes */}

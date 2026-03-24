@@ -79,6 +79,14 @@ export const removeAllowedInstructor = (email: string) =>
     api.delete<{ message: string }>(`/admin/instructors?email=${encodeURIComponent(email)}`).then(r => r.data);
 
 /* ── Loco Team ── */
+export interface LocoInstructor {
+    email: string;
+    name: string;
+    programs: string[];
+}
+export const getLocoSearchableInstructors = () =>
+    api.get<{ instructors: LocoInstructor[] }>('/admin/loco/instructors').then(r => r.data);
+
 export const getLocoUsers = () =>
     api.get<{ loco_users: { email: string }[] }>('/admin/loco').then(r => r.data);
 

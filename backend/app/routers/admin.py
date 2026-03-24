@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.dependencies import require_admin
+from app.dependencies import require_admin, get_current_user
 from app.models import UserInfo, StatusUpdateRequest
 from app.supabase_client import supabase
 from app.sheets import (
@@ -339,3 +339,33 @@ async def remove_loco_user(
     except Exception as e:
         logger.error(f"Failed to remove loco user {email}: {e}")
         raise HTTPException(status_code=500, detail="Failed to remove loco user")
+
+@router.get("/loco/instructors")
+async def get_loco_searchable_instructors(admin: UserInfo = Depends(get_current_user)):
+    """Get all instructors and their programs for Loco team to search."""
+    if admin.role not in ["admin", "loco"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    try:
+        res = supabase.table("classes").select("instructor_email,instructor_name,program").execute()
+        
+        instructors = {}
+        for row in (res.data or []):
+            email = str(row.get("instructor_email", "")).strip().lower()
+            name = str(row.get("instructor_name", "")).strip()
+            program = str(row.get("program", "")).strip()
+            if not email or "scaler instructor" in name.lower():
+                continue
+                
+            if email not in instructors:
+                instructors[email] = {"email": email, "name": name, "programs": set()}
+            if program:
+                instructors[email]["programs"].add(program)
+                
+        result = [
+            {"email": v["email"], "name": v["name"], "programs": sorted(list(v["programs"]))}
+            for v in instructors.values()
+        ]
+        return {"instructors": sorted(result, key=lambda x: x["name"])}
+    except Exception as e:
+        logger.error(f"Failed to fetch loco instructors: {e}")
+        return {"instructors": []}
