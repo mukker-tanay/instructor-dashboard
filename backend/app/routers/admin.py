@@ -346,11 +346,22 @@ async def get_loco_searchable_instructors(admin: UserInfo = Depends(get_current_
     if admin.role not in ["admin", "loco"]:
         raise HTTPException(status_code=403, detail="Not authorized")
     try:
+        allowed_res = supabase.table("allowed_instructors").select("email,alias_email").execute()
+        allowed_emails = set()
+        for row in (allowed_res.data or []):
+            if row.get("email"):
+                allowed_emails.add(str(row["email"]).strip().lower())
+            if row.get("alias_email"):
+                allowed_emails.add(str(row["alias_email"]).strip().lower())
+
         res = supabase.table("classes").select("instructor_email,instructor_name,program").execute()
         
         instructors = {}
         for row in (res.data or []):
             email = str(row.get("instructor_email", "")).strip().lower()
+            if email not in allowed_emails:
+                continue
+                
             name = str(row.get("instructor_name", "")).strip()
             program = str(row.get("program", "")).strip()
             if not email or "scaler instructor" in name.lower():
