@@ -122,11 +122,12 @@ async def get_instructor_options(user: UserInfo = Depends(get_current_user)):
     """Get unique instructor names from all classes (past + upcoming) for replacement dropdown."""
     instructors = set()
     try:
-        response = supabase.table("classes").select("instructor_name").execute()
+        response = supabase.table("classes").select("instructor_email,instructor_name").execute()
         for c in (response.data or []):
-            name = str(c.get("instructor_name", "")).strip()
-            if name and "scaler instructor" not in name.lower():
-                instructors.add(name)
+            email = str(c.get("instructor_email", "")).strip().lower()
+            name = str(c.get("instructor_name", "")).strip().lower()
+            if email and "scaler instructor" not in name:
+                instructors.add(email)
     except Exception as e:
         print(f"[ERROR] Failed to fetch instructors: {e}")
     return {"instructors": sorted(instructors)}

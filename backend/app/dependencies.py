@@ -16,11 +16,14 @@ async def get_current_user(request: Request) -> UserInfo:
     payload = decode_jwt(token)
     primary_email = payload["sub"].lower()
 
+    orig_email = payload.get("orig_email", "")
+
     real_user = UserInfo(
         email=primary_email,
         name=payload.get("name", ""),
         picture=payload.get("picture", ""),
         role=payload.get("role", "instructor"),
+        raised_by_email=orig_email,
     )
 
     # Impersonation (Admin or Loco)

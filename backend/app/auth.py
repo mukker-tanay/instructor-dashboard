@@ -29,6 +29,8 @@ def create_jwt(user: UserInfo) -> str:
         "role": user.role,
         "exp": datetime.now(timezone.utc) + timedelta(hours=settings.jwt_expiry_hours),
     }
+    if getattr(user, "raised_by_email", ""):
+        payload["orig_email"] = user.raised_by_email
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
@@ -213,6 +215,7 @@ async def impersonate(request: Request):
         name=real_name,
         picture="",
         role=resolve_role(target_email),
+        raised_by_email=payload["sub"]
     )
     new_token = create_jwt(target_user)
 
