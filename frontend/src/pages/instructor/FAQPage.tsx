@@ -8,12 +8,16 @@ const FAQPage: React.FC = () => {
             answer: "Yes, you can raise an unavailability request for a past class, but only if it occurred within the last 2 days (48 hours). For classes older than this, the option will be unavailable."
         },
         {
+            question: "How do I raise an unavailability for a past class?",
+            answer: "Go to My Classes, select the 'Past Classes' tab, click on the 'Raise Unavailability' button and fill in the required details."
+        },
+        {
             question: "How do I raise a class addition request?",
-            answer: "Click the 'Add New Class' button on your Dashboard. Ensure you fill out all mandatory fields, including the Batch Name, Module, Date, Time, Reason, and select an Approver. The request will automatically be sent to the relevant Slack channel for approval."
+            answer: "Click the 'Request Class Addition' button on your Dashboard. Ensure you fill out all mandatory fields, including the Batch Name, Module, Date, Time, Reason, and select an Approver. The request will automatically be sent to the relevant Slack channel for approval."
         },
         {
             question: "Why doesn't a batch show up under 'My Batches'?",
-            answer: "A batch will only appear in your 'My Batches' tab when you have been assigned to or taken more than 5 classes for that specific batch."
+            answer: "A batch will only appear in your 'My Batches' tab when you have been assigned as the primary instructor."
         },
         {
             question: "Why can't I raise an unavailability request for a specific class?",
@@ -44,23 +48,23 @@ const FAQPage: React.FC = () => {
 
             <div className="card" style={{ padding: 'var(--space-lg)' }}>
                 {faqs.map((faq, index) => (
-                    <div 
-                        key={index} 
-                        style={{ 
+                    <div
+                        key={index}
+                        style={{
                             borderBottom: index < faqs.length - 1 ? '1px solid var(--border-subtle)' : 'none',
                             paddingBottom: index < faqs.length - 1 ? 'var(--space-md)' : 0,
                             marginBottom: index < faqs.length - 1 ? 'var(--space-md)' : 0
                         }}
                     >
-                        <button 
+                        <button
                             onClick={() => toggleFaq(index)}
-                            style={{ 
-                                width: '100%', 
-                                display: 'flex', 
-                                justifyContent: 'space-between', 
-                                alignItems: 'center', 
-                                background: 'none', 
-                                border: 'none', 
+                            style={{
+                                width: '100%',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                background: 'none',
+                                border: 'none',
                                 padding: 'var(--space-sm) 0',
                                 cursor: 'pointer',
                                 textAlign: 'left',
@@ -70,7 +74,7 @@ const FAQPage: React.FC = () => {
                             }}
                         >
                             <span>{faq.question}</span>
-                            <span style={{ 
+                            <span style={{
                                 transform: openIndex === index ? 'rotate(180deg)' : 'rotate(0deg)',
                                 transition: 'transform 0.2s',
                                 color: 'var(--text-muted)'
@@ -78,9 +82,9 @@ const FAQPage: React.FC = () => {
                                 ▼
                             </span>
                         </button>
-                        
+
                         {openIndex === index && (
-                            <div style={{ 
+                            <div style={{
                                 paddingTop: 'var(--space-sm)',
                                 color: 'var(--text-secondary)',
                                 fontSize: '0.875rem',
