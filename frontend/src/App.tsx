@@ -10,6 +10,7 @@ import InstructorDashboard from './pages/instructor/InstructorDashboard';
 import MyRequests from './pages/instructor/MyRequests';
 import MyBatches from './pages/instructor/MyBatches';
 import PoliciesPage from './pages/instructor/PoliciesPage';
+import FAQPage from './pages/instructor/FAQPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import ImpersonateRoute from './pages/admin/ImpersonateRoute';
 import MetabaseQueries from './pages/admin/MetabaseQueries';
@@ -122,6 +123,9 @@ const AppContent: React.FC = () => {
             } />
             <Route path="/instructor/policies" element={
                 <ProtectedRoute blockLoco><AppLayout><PoliciesPage /></AppLayout></ProtectedRoute>
+            } />
+            <Route path="/instructor/faq" element={
+                <ProtectedRoute blockLoco><AppLayout><FAQPage /></AppLayout></ProtectedRoute>
             } />
 
             {/* Loco route */}

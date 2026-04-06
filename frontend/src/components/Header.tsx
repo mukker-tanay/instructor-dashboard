@@ -78,6 +78,12 @@ const Header: React.FC = () => {
                             >
                                 My Requests
                             </Link>
+                            <Link
+                                to="/instructor/faq"
+                                className={`nav-link ${isActive('/instructor/faq') ? 'active' : ''}`}
+                            >
+                                FAQ
+                            </Link>
                             {user?.role === 'admin' && (
                                 <Link
                                     to="/instructor/admin"
