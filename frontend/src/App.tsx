@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Analytics } from '@vercel/analytics/react';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import Header from './components/Header';
 import logoImg from './images/logo.png';
@@ -157,6 +158,7 @@ const App: React.FC = () => (
                 <AppContent />
             </AuthProvider>
         </BrowserRouter>
+        <Analytics />
     </QueryClientProvider>
 );
 
