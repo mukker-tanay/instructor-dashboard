@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import Header from './components/Header';
 import logoImg from './images/logo.png';
+import Modal from './components/Modal';
 
 // Pages
 import InstructorDashboard from './pages/instructor/InstructorDashboard';
@@ -28,8 +29,28 @@ const queryClient = new QueryClient({
 /* ── Login page ── */
 const LoginPage: React.FC = () => {
     const { login } = useAuth();
+    const [showAccessError, setShowAccessError] = useState(false);
+
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('error') === 'unauthorized') {
+            setShowAccessError(true);
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+    }, []);
+
     return (
         <div className="login-page">
+            <Modal isOpen={showAccessError} onClose={() => setShowAccessError(false)} title="Access Denied">
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9375rem', marginBottom: '1.5rem', lineHeight: 1.5 }}>
+                    You don't have access. Please reach out to the classroom team for access.
+                </p>
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <button className="btn btn-primary" onClick={() => setShowAccessError(false)}>
+                        Understood
+                    </button>
+                </div>
+            </Modal>
             <div className="login-card">
                 <div style={{ marginBottom: '16px' }}>
                     <img src={logoImg} alt="Logo" style={{ maxHeight: '48px', maxWidth: '100%', objectFit: 'contain' }} />
