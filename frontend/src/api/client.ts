@@ -142,7 +142,7 @@ export interface SystemLog {
     trace?: string;
     metadata?: Record<string, any>;
 }
-export const getSystemLogs = (level?: string, limit: number = 100) =>
-    api.get<SystemLog[]>('/logs', { params: { level, limit } }).then(r => r.data);
+export const getSystemLogs = (level?: string, search?: string, limit: number = 100) =>
+    api.get<SystemLog[]>('/logs', { params: { level, search, limit } }).then(r => r.data);
 
 export default api;

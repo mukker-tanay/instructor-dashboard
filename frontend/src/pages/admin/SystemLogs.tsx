@@ -114,12 +114,14 @@ export const SystemLogs: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [filterLevel, setFilterLevel] = useState<string>('ALL');
+    const [searchTerm, setSearchTerm] = useState<string>('');
 
-    const fetchLogs = async () => {
+    const fetchLogs = async (searchOverride?: string) => {
         try {
             setLoading(true);
             const level = filterLevel === 'ALL' ? undefined : filterLevel;
-            const data = await getSystemLogs(level, 100);
+            const search = searchOverride !== undefined ? searchOverride : searchTerm;
+            const data = await getSystemLogs(level, search, 100);
             setLogs(data);
             setError(null);
         } catch (err: any) {
@@ -129,11 +131,16 @@ export const SystemLogs: React.FC = () => {
         }
     };
 
+    // Debounced search effect
     useEffect(() => {
-        if (user?.role === 'admin') {
+        if (user?.role !== 'admin') return;
+        
+        const timer = setTimeout(() => {
             fetchLogs();
-        }
-    }, [user, filterLevel]);
+        }, 500);
+
+        return () => clearTimeout(timer);
+    }, [user, filterLevel, searchTerm]);
 
     if (user?.role !== 'admin') {
         return (
@@ -158,6 +165,33 @@ export const SystemLogs: React.FC = () => {
                     <p className="page-subtitle">Real-time backend system alerts, errors, and login tracking.</p>
                 </div>
                 <div style={{ display: 'flex', gap: 'var(--space-md)', alignItems: 'center' }}>
+                    <div style={{ position: 'relative', width: '250px' }}>
+                        <input
+                            type="text"
+                            placeholder="Search logs/logins..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="form-input"
+                            style={{ paddingRight: '35px' }}
+                        />
+                        {searchTerm && (
+                            <button
+                                onClick={() => setSearchTerm('')}
+                                style={{
+                                    position: 'absolute',
+                                    right: '10px',
+                                    top: '50%',
+                                    transform: 'translateY(-50%)',
+                                    background: 'none',
+                                    border: 'none',
+                                    color: 'var(--text-muted)',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                ✕
+                            </button>
+                        )}
+                    </div>
                     <select
                         value={filterLevel}
                         onChange={(e) => setFilterLevel(e.target.value)}
@@ -170,7 +204,7 @@ export const SystemLogs: React.FC = () => {
                         <option value="INFO">Info</option>
                     </select>
                     <button
-                        onClick={fetchLogs}
+                        onClick={() => fetchLogs()}
                         disabled={loading}
                         className="btn btn-primary"
                     >

@@ -11,6 +11,7 @@ router = APIRouter(prefix="/api/logs", tags=["Logs"])
 @router.get("")
 async def get_system_logs(
     level: Optional[str] = None,
+    search: Optional[str] = None,
     limit: int = Query(100, le=1000),
     user: UserInfo = Depends(require_admin)
 ):
@@ -23,6 +24,12 @@ async def get_system_logs(
         
         if level:
             query = query.eq("level", level)
+            
+        if search:
+            # Use .or() to search message or logger_name
+            # ilike performs case-insensitive search
+            search_pattern = f"%{search}%"
+            query = query.or_(f"message.ilike.{search_pattern},logger_name.ilike.{search_pattern}")
             
         result = query.execute()
         return result.data
