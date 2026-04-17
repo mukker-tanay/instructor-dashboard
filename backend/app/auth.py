@@ -109,6 +109,9 @@ async def auth_callback(request: Request, code: str):
 
     email = userinfo.get("email", "")
     role = resolve_role(email)
+    
+    # LOG SUCCESSFUL LOGIN
+    logger.info(f"User logged in: {email} (Role: {role})")
 
     # INSTRUCTOR ACCESS & ALIAS RESOLUTION
     try:
