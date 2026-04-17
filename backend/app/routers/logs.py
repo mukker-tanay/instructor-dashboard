@@ -6,9 +6,9 @@ from app.dependencies import require_admin
 from app.models import UserInfo
 from app.supabase_client import supabase
 
-router = APIRouter(prefix="/logs", tags=["Logs"])
+router = APIRouter(prefix="/api/logs", tags=["Logs"])
 
-@router.get("/")
+@router.get("")
 async def get_system_logs(
     level: Optional[str] = None,
     limit: int = Query(100, le=1000),
