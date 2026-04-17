@@ -1,7 +1,28 @@
 import React, { useEffect, useState } from 'react';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../auth/AuthContext';
 import { getSystemLogs, SystemLog } from '../../api/client';
-import { AlertCircle, FileText, ChevronDown, ChevronRight, RefreshCw, XCircle } from 'lucide-react';
+
+// Inline simple SVGs to avoid dependency issues
+const Icons = {
+    AlertCircle: () => (
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    ),
+    FileText: () => (
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+    ),
+    ChevronDown: () => (
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+    ),
+    ChevronRight: () => (
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+    ),
+    RefreshCw: ({ className }: { className?: string }) => (
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+    ),
+    XCircle: () => (
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+    )
+};
 
 const getLevelColor = (level: string) => {
     switch (level.toUpperCase()) {
@@ -37,7 +58,7 @@ const LogRow: React.FC<{ log: SystemLog }> = ({ log }) => {
                 </div>
                 <div className="col-span-1 flex justify-end text-slate-500">
                     {(log.trace || log.metadata) && (
-                        expanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />
+                        expanded ? <Icons.ChevronDown /> : <Icons.ChevronRight />
                     )}
                 </div>
             </div>
@@ -92,7 +113,9 @@ export const SystemLogs: React.FC = () => {
     if (user?.role !== 'admin') {
         return (
             <div className="max-w-7xl mx-auto px-4 py-12 text-center">
-                <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+                <div className="mx-auto mb-4 flex justify-center text-red-500">
+                    <Icons.AlertCircle />
+                </div>
                 <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
                 <p className="text-slate-400">You do not have permission to view system logs.</p>
             </div>
@@ -104,7 +127,7 @@ export const SystemLogs: React.FC = () => {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
                 <div>
                     <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight flex items-center gap-2">
-                        <FileText className="text-indigo-400" />
+                        <span className="text-indigo-400"><Icons.FileText /></span>
                         System Logs
                     </h1>
                     <p className="text-slate-400 mt-2">Real-time backend system alerts and errors.</p>
@@ -125,7 +148,7 @@ export const SystemLogs: React.FC = () => {
                         disabled={loading}
                         className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors disabled:opacity-50"
                     >
-                        <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+                        <Icons.RefreshCw className={loading ? 'animate-spin' : ''} />
                         Refresh
                     </button>
                 </div>
@@ -133,7 +156,7 @@ export const SystemLogs: React.FC = () => {
 
             {error && (
                 <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-start gap-3">
-                    <XCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                    <span className="text-red-400 flex-shrink-0 mt-0.5"><Icons.XCircle /></span>
                     <p className="text-red-400 text-sm">{error}</p>
                 </div>
             )}
