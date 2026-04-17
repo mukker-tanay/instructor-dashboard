@@ -16,11 +16,13 @@ class SupabaseLogHandler(logging.Handler):
             message = record.getMessage()
 
             def _insert_log():
+                # Import inside to avoid circular dependencies
                 from app.supabase_client import supabase
                 if not supabase:
                     return
 
                 try:
+                    # We use a direct postgrest call to avoid any potential side-effect logging
                     supabase.table("system_logs").insert({
                         "level": record.levelname,
                         "logger_name": record.name,
@@ -33,7 +35,7 @@ class SupabaseLogHandler(logging.Handler):
                         }
                     }).execute()
                 except Exception:
-                    # Fail silently so logging error doesn't kill the app
+                    # ABSOLUTELY SILENT: prevent logging loops if Supabase is down
                     pass 
 
             _executor.submit(_insert_log)
