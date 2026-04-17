@@ -138,6 +138,16 @@ const Header: React.FC = () => {
                                 >
                                     Metabase Queries
                                 </Link>
+                                {user.role === 'admin' && (
+                                    <Link
+                                        to="/admin/logs"
+                                        className="dropdown-item"
+                                        onClick={() => setShowDropdown(false)}
+                                        style={{ display: 'block' }}
+                                    >
+                                        System Logs
+                                    </Link>
+                                )}
                                 <button className="dropdown-item danger" onClick={logout}>
                                     Sign Out
                                 </button>

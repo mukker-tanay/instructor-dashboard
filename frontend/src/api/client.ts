@@ -132,4 +132,17 @@ export const addMetabaseQuery = (data: { title: string; url: string; description
 export const deleteMetabaseQuery = (queryId: string) =>
     api.delete(`/metabase/${queryId}`).then(r => r.data);
 
+/* ── System Logs ── */
+export interface SystemLog {
+    id: string;
+    timestamp: string;
+    level: string;
+    logger_name: string;
+    message: string;
+    trace?: string;
+    metadata?: Record<string, any>;
+}
+export const getSystemLogs = (level?: string, limit: number = 100) =>
+    api.get<SystemLog[]>('/logs', { params: { level, limit } }).then(r => r.data);
+
 export default api;

@@ -17,12 +17,16 @@ from app.routers.requests import router as requests_router
 from app.routers.admin import router as admin_router
 from app.routers.policies import router as policies_router
 from app.routers.metabase import router as metabase_router
+from app.routers.logs import router as logs_router
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+from app.logger import setup_logging
+setup_logging()
 
 
 @asynccontextmanager
@@ -67,7 +71,7 @@ app.include_router(requests_router)
 app.include_router(admin_router)
 app.include_router(policies_router)
 app.include_router(metabase_router)
-
+app.include_router(logs_router)
 
 @app.get("/api/health")
 async def health_check():

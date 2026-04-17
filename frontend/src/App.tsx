@@ -15,6 +15,7 @@ import FAQPage from './pages/instructor/FAQPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import ImpersonateRoute from './pages/admin/ImpersonateRoute';
 import MetabaseQueries from './pages/admin/MetabaseQueries';
+import { SystemLogs } from './pages/admin/SystemLogs';
 import LocoDashboard from './pages/loco/LocoDashboard';
 
 const queryClient = new QueryClient({
@@ -160,6 +161,9 @@ const AppContent: React.FC = () => {
             } />
             <Route path="/admin/metabase" element={
                 <ProtectedRoute><AppLayout><MetabaseQueries /></AppLayout></ProtectedRoute>
+            } />
+            <Route path="/admin/logs" element={
+                <ProtectedRoute adminOnly><AppLayout><SystemLogs /></AppLayout></ProtectedRoute>
             } />
             <Route path="/admin/becomes/:email" element={
                 <ProtectedRoute adminOnly><ImpersonateRoute /></ProtectedRoute>
