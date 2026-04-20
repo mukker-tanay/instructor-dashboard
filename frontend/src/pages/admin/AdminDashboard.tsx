@@ -43,7 +43,7 @@ const AdminDashboard: React.FC = () => {
     const [finalStatus, setFinalStatus] = useState('');
     const [replacementInstructor, setReplacementInstructor] = useState('');
     const [redFlagProof, setRedFlagProof] = useState('');
-    const [instructorOptions, setInstructorOptions] = useState<string[]>([]);
+    const [instructorOptions, setInstructorOptions] = useState<{name: string, email: string}[]>([]);
 
     // Class addition-specific fields
     const [paymentStatus, setPaymentStatus] = useState('Sanctioned');
@@ -548,8 +548,8 @@ const AdminDashboard: React.FC = () => {
                                                 <label className="form-label">Replacement Instructor</label>
                                                 <select className="form-select" value={replacementInstructor} onChange={e => setReplacementInstructor(e.target.value)}>
                                                     <option value="">Select instructor...</option>
-                                                    {instructorOptions.map(name => (
-                                                        <option key={name} value={name}>{name}</option>
+                                                    {instructorOptions.map(inst => (
+                                                        <option key={inst.email} value={inst.email}>{inst.name} ({inst.email})</option>
                                                     ))}
                                                 </select>
                                             </div>

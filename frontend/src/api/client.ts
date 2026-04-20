@@ -28,8 +28,9 @@ export const getClasses = (type: 'upcoming' | 'past', limit = 5, offset = 0) =>
 export const getBatchOptions = () =>
     api.get<{ batches: string[] }>('/classes/batch-options').then(r => r.data);
 
+export type InstructorOption = { name: string; email: string };
 export const getInstructorOptions = () =>
-    api.get<{ instructors: string[] }>('/classes/instructors').then(r => r.data);
+    api.get<{ instructors: InstructorOption[] }>('/classes/instructors').then(r => r.data);
 
 export type BatchMeta = { program: string; modules: string[] };
 export const getBatchMetadata = () =>

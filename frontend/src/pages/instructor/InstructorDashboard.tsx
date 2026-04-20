@@ -24,7 +24,7 @@ const UnavailabilityModal: React.FC<UnavailModalProps> = ({ cls, isOpen, onClose
     const [otherComments, setOtherComments] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
-    const [instructorOptions, setInstructorOptions] = useState<string[]>([]);
+    const [instructorOptions, setInstructorOptions] = useState<{name: string, email: string}[]>([]);
 
     useEffect(() => {
         if (isOpen) {
@@ -100,7 +100,7 @@ const UnavailabilityModal: React.FC<UnavailModalProps> = ({ cls, isOpen, onClose
             <div className="form-group">
                 <label className="form-label">Suggested Instructors for Replacement</label>
                 <SearchableDropdown
-                    options={instructorOptions}
+                    options={Array.from(new Set(instructorOptions.map(i => i.name))).filter(Boolean).sort()}
                     value={suggestedReplacement}
                     onChange={setSuggestedReplacement}
                     placeholder="Select an instructor (optional)"

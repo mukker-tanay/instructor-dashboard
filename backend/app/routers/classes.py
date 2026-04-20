@@ -125,17 +125,18 @@ async def get_batch_options(user: UserInfo = Depends(get_current_user)):
 @router.get("/instructors")
 async def get_instructor_options(user: UserInfo = Depends(get_current_user)):
     """Get unique instructor names from all classes (past + upcoming) for replacement dropdown."""
-    instructors = set()
+    instructors_dict = {}
     try:
         response = supabase.table("classes").select("instructor_email,instructor_name").execute()
         for c in (response.data or []):
             email = str(c.get("instructor_email", "")).strip().lower()
-            name = str(c.get("instructor_name", "")).strip().lower()
-            if email and "scaler instructor" not in name:
-                instructors.add(email)
+            name = str(c.get("instructor_name", "")).strip()
+            if email and "scaler instructor" not in name.lower():
+                instructors_dict[email] = {"email": email, "name": name}
     except Exception as e:
         print(f"[ERROR] Failed to fetch instructors: {e}")
-    return {"instructors": sorted(instructors)}
+    result = sorted(instructors_dict.values(), key=lambda x: x["name"].lower())
+    return {"instructors": result}
 
 
 @router.get("/batch-metadata")
