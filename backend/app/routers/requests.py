@@ -7,10 +7,11 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, require_admin
 from app.models import (
     UserInfo,
     UnavailabilityRequestCreate,
+    AdminUnavailabilityRequestCreate,
     ClassAdditionRequestCreate,
 )
 from app.supabase_client import supabase
@@ -179,6 +180,95 @@ async def create_unavailability_request(
         await send_workflow_payload(webhook_url, workflow_data)
 
     return {"message": "Unavailability request(s) submitted.", "requests": results}
+
+
+@router.post("/admin/unavailability-requests")
+async def create_admin_unavailability_request(
+    body: AdminUnavailabilityRequestCreate,
+    admin_user: UserInfo = Depends(require_admin),
+):
+    """Admin endpoint to manually raise an unavailability request for any instructor."""
+    date_fmt = _fmt_date(body.date_of_class)
+    
+    # Validations
+    _check_duplicate_unavailability(body.instructor_email, body.batch_name, body.class_title, date_fmt)
+
+    request_id = str(uuid.uuid4())
+    now_dt = datetime.now(IST)
+
+    supabase_record = {
+        "id": request_id,
+        "instructor_email": body.instructor_email,
+        "instructor_name": body.instructor_name,
+        "program": body.program,
+        "batch_name": body.batch_name,
+        "sbat_group_id": body.sbat_group_id,
+        "module_name": body.module_name,
+        "class_title": body.class_title,
+        "original_date_of_class": date_fmt,
+        "original_time_of_class": body.time_of_class,
+        "class_type": body.class_type,
+        "reason_for_unavailability": body.reason,
+        "any_other_comments": body.other_comments or "",
+        "suggested_instructors_for_replacement": body.suggested_replacement or "",
+        "topics_and_promises": body.topics_and_promises,
+        "batch_pulse_persona": body.batch_pulse_persona,
+        "recommended_teaching_pace": body.teaching_pace_style,
+        "raised_timestamp": now_dt.isoformat(),
+        "raised_by": admin_user.email,  # Track that the admin raised this
+        "slack_thread_link": "",
+        "final_status": "",
+        "replacement_instructor": "",
+        "class_rating_in_case_of_replacement": "",
+        "red_flag_proof": "",
+        "status": "Pending",
+        "pushed_to_sheet": False
+    }
+
+    try:
+        supabase.table("unavailability_requests").insert(supabase_record).execute()
+    except Exception as e:
+        logger.error(f"Failed to insert admin unavailability request into Supabase: {e}")
+        raise HTTPException(status_code=500, detail="Database insertion failed")
+
+    # --- Slack Workflow Notification ---
+    suggested_replacement_id = "U123456789"
+    if body.suggested_replacement and body.suggested_replacement.strip():
+        try:
+            res = supabase.table("slack_members").select("id").ilike("name", f"%{body.suggested_replacement.strip()}%").limit(1).execute()
+            if res.data:
+                suggested_replacement_id = res.data[0]["id"]
+        except Exception as e:
+            logger.error(f"Failed to lookup slack ID for replacement '{body.suggested_replacement}': {e}")
+
+    workflow_data = {
+        "instructor_email":      body.instructor_email,
+        "instructor_name":       body.instructor_name,
+        "program":               body.program,
+        "batch_name":            body.batch_name,
+        "sbat_group_id":         str(body.sbat_group_id),
+        "class_title":           body.class_title,
+        "module_name":           body.module_name,
+        "date_of_class":         date_fmt,
+        "time_of_class":         body.time_of_class,
+        "class_type":            body.class_type,
+        "reason":                body.reason,
+        "suggested_replacement": suggested_replacement_id,
+        "other_comments":        body.other_comments or "",
+        "topics_and_promises":   body.topics_and_promises,
+        "batch_pulse_persona":   body.batch_pulse_persona,
+        "teaching_pace_style":   body.teaching_pace_style,
+    }
+
+    program_lower = body.program.lower()
+    if "academy" in program_lower or "devops" in program_lower:
+        webhook_url = settings.slack_unavailability_webhook_academy_devops
+    else:
+        webhook_url = settings.slack_unavailability_webhook_dsml_aiml
+        
+    await send_workflow_payload(webhook_url, workflow_data)
+
+    return {"message": "Admin unavailability request submitted.", "request_id": request_id}
 
 
 @router.post("/class-addition-requests")

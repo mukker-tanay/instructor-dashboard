@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { getAdminRequests, updateRequestStatus, getInstructorOptions, deleteRequests, getAllowedInstructors, addAllowedInstructor, removeAllowedInstructor, updateAllowedInstructorAlias, getLocoUsers, addLocoUser, removeLocoUser } from '../../api/client';
 import type { RequestItem, StatusUpdate } from '../../types';
 import Modal from '../../components/Modal';
+import AdminManualUnavailability from './AdminManualUnavailability';
 
 const AdminDashboard: React.FC = () => {
     const [requests, setRequests] = useState<RequestItem[]>([]);
@@ -12,7 +13,7 @@ const AdminDashboard: React.FC = () => {
     const [showModal, setShowModal] = useState(false);
 
     // Top-level navigation
-    const [activeView, setActiveView] = useState<'requests' | 'access' | 'loco'>('requests');
+    const [activeView, setActiveView] = useState<'requests' | 'access' | 'loco' | 'manual'>('requests');
 
     // Access Control state
     const [instructors, setInstructors] = useState<{ email: string; added_by?: string; added_at?: string; alias_email?: string }[]>([]);
@@ -327,6 +328,7 @@ const AdminDashboard: React.FC = () => {
                     <button className={`tab ${activeView === 'requests' ? 'active' : ''}`} onClick={() => setActiveView('requests')}>Requests</button>
                     <button className={`tab ${activeView === 'access' ? 'active' : ''}`} onClick={() => setActiveView('access')}>Access Control</button>
                     <button className={`tab ${activeView === 'loco' ? 'active' : ''}`} onClick={() => setActiveView('loco')}>Loco Team</button>
+                    <button className={`tab ${activeView === 'manual' ? 'active' : ''}`} onClick={() => setActiveView('manual')}>Manual Override</button>
                 </div>
             </div>
 
@@ -785,6 +787,8 @@ const AdminDashboard: React.FC = () => {
                         )}
                     </div>
                 </div>
+            ) : activeView === 'manual' ? (
+                <AdminManualUnavailability />
             ) : null}
 
             {/* Alias Modal */}

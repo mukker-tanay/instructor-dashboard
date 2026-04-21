@@ -65,6 +65,26 @@ class UnavailabilityRequestCreate(BaseModel):
     approvers: List[str] = Field(default_factory=list, description="List of selected approvers")
 
 
+class AdminUnavailabilityRequestCreate(BaseModel):
+    """Payload from admin manually raising an unavailability request."""
+    instructor_email: str = Field(..., description="Target instructor email")
+    instructor_name: str = Field(..., description="Target instructor name")
+    program: str = Field(..., description="Program (e.g., Academy)")
+    batch_name: str = Field(..., description="Batch Name")
+    sbat_group_id: Optional[str] = ""
+    module_name: str = Field(..., description="Module Name")
+    class_title: str = Field(..., description="Class Title/Topic")
+    date_of_class: str = Field(..., description="Date of Class")
+    time_of_class: str = Field(..., description="Time of Class")
+    class_type: str = Field(..., description="Regular or Optional")
+    reason: str = Field(..., min_length=1)
+    topics_and_promises: str = Field(..., min_length=1)
+    batch_pulse_persona: str = Field(..., min_length=1)
+    teaching_pace_style: str = Field(..., min_length=1)
+    suggested_replacement: Optional[str] = ""
+    other_comments: Optional[str] = ""
+
+
 class UnavailabilityRequestRow(BaseModel):
     """Full row representation in the sheet."""
     request_id: str = Field(default_factory=lambda: str(uuid.uuid4()))

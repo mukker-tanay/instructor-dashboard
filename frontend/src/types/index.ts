@@ -39,6 +39,25 @@ export interface UnavailabilityPayload {
     approvers?: string[];
 }
 
+export interface AdminUnavailabilityPayload {
+    instructor_email: string;
+    instructor_name: string;
+    program: string;
+    batch_name: string;
+    sbat_group_id?: string;
+    module_name: string;
+    class_title: string;
+    date_of_class: string;
+    time_of_class: string;
+    class_type: string;
+    reason: string;
+    topics_and_promises: string;
+    batch_pulse_persona: string;
+    teaching_pace_style: string;
+    suggested_replacement?: string;
+    other_comments?: string;
+}
+
 export interface ClassAdditionPayload {
     program: string;
     batch_name: string;

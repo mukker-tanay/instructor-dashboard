@@ -3,6 +3,7 @@ import type {
     User,
     ClassesResponse,
     UnavailabilityPayload,
+    AdminUnavailabilityPayload,
     ClassAdditionPayload,
     RequestsResponse,
     StatusUpdate,
@@ -56,6 +57,9 @@ export const getMyRequests = () =>
     api.get<RequestsResponse>('/my-requests').then(r => r.data);
 
 /* ── Admin ── */
+export const createAdminUnavailabilityRequest = (data: AdminUnavailabilityPayload) =>
+    api.post('/admin/unavailability-requests', data).then(r => r.data);
+
 export const getAdminRequests = (status = 'all', requestType = 'all') =>
     api.get<RequestsResponse>('/admin/requests', {
         params: { status, request_type: requestType },
