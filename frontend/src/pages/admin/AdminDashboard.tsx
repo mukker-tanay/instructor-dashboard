@@ -45,6 +45,7 @@ const AdminDashboard: React.FC = () => {
     const [replacementInstructor, setReplacementInstructor] = useState('');
     const [redFlagProof, setRedFlagProof] = useState('');
     const [instructorOptions, setInstructorOptions] = useState<{name: string, email: string}[]>([]);
+    const [customInstructor, setCustomInstructor] = useState('');
 
     // Class addition-specific fields
     const [paymentStatus, setPaymentStatus] = useState('Sanctioned');
@@ -253,6 +254,7 @@ const AdminDashboard: React.FC = () => {
 
         setFinalStatus('');
         setReplacementInstructor('');
+        setCustomInstructor('');
         setRedFlagProof('');
 
         if (r.request_type === 'unavailability') {
@@ -282,7 +284,9 @@ const AdminDashboard: React.FC = () => {
             if (statusVal === 'Approved') {
                 if (isUnavail) {
                     payload.final_status = finalStatus || undefined;
-                    payload.replacement_instructor = replacementInstructor || undefined;
+                    payload.replacement_instructor = replacementInstructor === '__others__'
+                        ? customInstructor || undefined
+                        : replacementInstructor || undefined;
                     payload.red_flag_reason = redFlagProof || undefined;
                 } else {
                     payload.payment_status = paymentStatus as any;
@@ -548,12 +552,26 @@ const AdminDashboard: React.FC = () => {
                                         {finalStatus === 'Instructor change' && (
                                             <div className="form-group">
                                                 <label className="form-label">Replacement Instructor</label>
-                                                <select className="form-select" value={replacementInstructor} onChange={e => setReplacementInstructor(e.target.value)}>
+                                                <select className="form-select" value={replacementInstructor} onChange={e => {
+                                                    setReplacementInstructor(e.target.value);
+                                                    if (e.target.value !== '__others__') setCustomInstructor('');
+                                                }}>
                                                     <option value="">Select instructor...</option>
                                                     {instructorOptions.map(inst => (
                                                         <option key={inst.email} value={inst.email}>{inst.name} ({inst.email})</option>
                                                     ))}
+                                                    <option value="__others__">Others</option>
                                                 </select>
+                                                {replacementInstructor === '__others__' && (
+                                                    <input
+                                                        type="text"
+                                                        className="form-input"
+                                                        style={{ marginTop: '8px' }}
+                                                        placeholder="Enter instructor name or email..."
+                                                        value={customInstructor}
+                                                        onChange={e => setCustomInstructor(e.target.value)}
+                                                    />
+                                                )}
                                             </div>
                                         )}
 
