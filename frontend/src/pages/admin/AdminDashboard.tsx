@@ -577,7 +577,7 @@ const AdminDashboard: React.FC = () => {
                                             <label className="form-label">Payment Status</label>
                                             <select className="form-select" value={paymentStatus} onChange={e => setPaymentStatus(e.target.value)}>
                                                 <option value="Sanctioned">Sanctioned</option>
-                                                <option value="Non-sanctioned">Non-sanctioned</option>
+                                                <option value="Non- Sanctioned">Non- Sanctioned</option>
                                                 <option value="Unpaid">Unpaid</option>
                                                 <option value="To be Audited">To be Audited</option>
                                                 <option value="Pending">Pending</option>
@@ -588,8 +588,8 @@ const AdminDashboard: React.FC = () => {
                                             <label className="form-label">Class Added On</label>
                                             <select className="form-select" value={classAddedOnDay} onChange={e => setClassAddedOnDay(e.target.value)}>
                                                 <option value="">Not specified</option>
-                                                <option value="Class added on class day">Class added on class day</option>
-                                                <option value="Class added on non-class day">Class added on non-class day</option>
+                                                <option value="Class Added on Class Day">Class Added on Class Day</option>
+                                                <option value="Class added on Non-class day">Class added on Non-class day</option>
                                             </select>
                                         </div>
 
@@ -597,11 +597,11 @@ const AdminDashboard: React.FC = () => {
                                             <label className="form-label">Red Flag Exemption</label>
                                             <select className="form-select" value={redFlag} onChange={e => setRedFlag(e.target.value)}>
                                                 <option value="No">No</option>
-                                                <option value="Yes">Yes</option>
+                                                <option value="Exempted">Exempted</option>
                                             </select>
                                         </div>
 
-                                        {redFlag === 'Yes' && (
+                                        {redFlag === 'Exempted' && (
                                             <div className="form-group">
                                                 <label className="form-label form-label-required">Red Flag Proof</label>
                                                 <textarea
