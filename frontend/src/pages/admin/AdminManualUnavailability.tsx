@@ -106,7 +106,10 @@ const AdminManualUnavailability: React.FC = () => {
     const [batchPulse, setBatchPulse] = useState('');
     const [teachingPace, setTeachingPace] = useState('');
     const [suggestedReplacement, setSuggestedReplacement] = useState('');
+    const [customSuggestedReplacement, setCustomSuggestedReplacement] = useState('');
     const [otherComments, setOtherComments] = useState('');
+    const [customInstructorName, setCustomInstructorName] = useState('');
+    const [customInstructorEmail, setCustomInstructorEmail] = useState('');
 
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
@@ -131,7 +134,10 @@ const AdminManualUnavailability: React.FC = () => {
         setBatchPulse('');
         setTeachingPace('');
         setSuggestedReplacement('');
+        setCustomSuggestedReplacement('');
         setOtherComments('');
+        setCustomInstructorName('');
+        setCustomInstructorEmail('');
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -145,15 +151,25 @@ const AdminManualUnavailability: React.FC = () => {
         }
 
         // Parse instructor display back to name/email
-        const instMatch = selectedInstructorDisplay.match(/^(.*) \((.*)\)$/);
-        let instructor_name = selectedInstructorDisplay;
+        let instructor_name = '';
         let instructor_email = '';
-        if (instMatch) {
-            instructor_name = instMatch[1];
-            instructor_email = instMatch[2];
+
+        if (selectedInstructorDisplay === 'Others') {
+            instructor_name = customInstructorName.trim();
+            instructor_email = customInstructorEmail.trim();
+            if (!instructor_name || !instructor_email) {
+                setError('Please enter both name and email for the custom instructor.');
+                return;
+            }
         } else {
-            setError('Invalid instructor selection. Please select from the dropdown.');
-            return;
+            const instMatch = selectedInstructorDisplay.match(/^(.*) \((.*)\)$/);
+            if (instMatch) {
+                instructor_name = instMatch[1];
+                instructor_email = instMatch[2];
+            } else {
+                setError('Invalid instructor selection. Please select from the dropdown.');
+                return;
+            }
         }
 
         setSubmitting(true);
@@ -173,7 +189,9 @@ const AdminManualUnavailability: React.FC = () => {
                 topics_and_promises: topics,
                 batch_pulse_persona: batchPulse,
                 teaching_pace_style: teachingPace,
-                suggested_replacement: suggestedReplacement,
+                suggested_replacement: suggestedReplacement === 'Others'
+                    ? customSuggestedReplacement
+                    : suggestedReplacement,
                 other_comments: otherComments
             };
             
@@ -187,8 +205,8 @@ const AdminManualUnavailability: React.FC = () => {
         }
     };
 
-    const instructorOptions = instructors.map(i => `${i.name} (${i.email})`);
-    const replacementOptions = Array.from(new Set(instructors.map(i => i.name))).filter(Boolean).sort();
+    const instructorOptions = [...instructors.map(i => `${i.name} (${i.email})`), 'Others'];
+    const replacementOptions = [...Array.from(new Set(instructors.map(i => i.name))).filter(Boolean).sort(), 'Others'];
 
     return (
         <div style={{ marginTop: '20px' }}>
@@ -215,9 +233,31 @@ const AdminManualUnavailability: React.FC = () => {
                         <SearchableDropdown
                             options={instructorOptions}
                             value={selectedInstructorDisplay}
-                            onChange={setSelectedInstructorDisplay}
+                            onChange={val => {
+                                setSelectedInstructorDisplay(val);
+                                if (val !== 'Others') {
+                                    setCustomInstructorName('');
+                                    setCustomInstructorEmail('');
+                                }
+                            }}
                             placeholder="Select the instructor who is unavailable..."
                         />
+                        {selectedInstructorDisplay === 'Others' && (
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '8px' }}>
+                                <input
+                                    className="form-input"
+                                    placeholder="Instructor name *"
+                                    value={customInstructorName}
+                                    onChange={e => setCustomInstructorName(e.target.value)}
+                                />
+                                <input
+                                    className="form-input"
+                                    placeholder="Instructor email *"
+                                    value={customInstructorEmail}
+                                    onChange={e => setCustomInstructorEmail(e.target.value)}
+                                />
+                            </div>
+                        )}
                     </div>
 
                     <div className="form-group">
@@ -284,9 +324,21 @@ const AdminManualUnavailability: React.FC = () => {
                         <SearchableDropdown
                             options={replacementOptions}
                             value={suggestedReplacement}
-                            onChange={setSuggestedReplacement}
+                            onChange={val => {
+                                setSuggestedReplacement(val);
+                                if (val !== 'Others') setCustomSuggestedReplacement('');
+                            }}
                             placeholder="Select an instructor (optional)"
                         />
+                        {suggestedReplacement === 'Others' && (
+                            <input
+                                className="form-input"
+                                style={{ marginTop: '8px' }}
+                                placeholder="Enter instructor name or email..."
+                                value={customSuggestedReplacement}
+                                onChange={e => setCustomSuggestedReplacement(e.target.value)}
+                            />
+                        )}
                     </div>
 
                     <div className="form-group" style={{ gridColumn: '1 / -1' }}>
