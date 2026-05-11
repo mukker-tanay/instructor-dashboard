@@ -23,6 +23,7 @@ class RequestStatus(str, Enum):
 class PaymentStatus(str, Enum):
     SANCTIONED = "Sanctioned"
     NON_SANCTIONED = "Non-sanctioned"
+    NON_SANCTIONED_V2 = "Non- Sanctioned"
     UNPAID = "Unpaid"
     TO_BE_AUDITED = "To be Audited"
     PENDING = "Pending"
@@ -30,6 +31,7 @@ class PaymentStatus(str, Enum):
 
 class RedFlag(str, Enum):
     YES = "Yes"
+    EXEMPTED = "Exempted"
     NO = "No"
 
 

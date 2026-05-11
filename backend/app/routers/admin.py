@@ -140,7 +140,7 @@ async def update_request_status(
          raise HTTPException(status_code=400, detail="Unavailability request already finalized.")
 
     # Red flag validation
-    if body.red_flag and body.red_flag.value == "Yes" and not body.red_flag_reason:
+    if body.red_flag and body.red_flag.value in ("Yes", "Exempted") and not body.red_flag_reason:
         raise HTTPException(status_code=400, detail="Red flag reason is required.")
 
     # Build updates for Supabase
@@ -159,7 +159,7 @@ async def update_request_status(
             updates["class_added_on_class_day"] = body.class_added_on_class_day
         if body.red_flag:
             updates["red_flag"] = body.red_flag.value
-            if body.red_flag.value == "Yes" and body.red_flag_reason:
+            if body.red_flag.value in ("Yes", "Exempted") and body.red_flag_reason:
                 updates["red_flag_proof"] = body.red_flag_reason
 
     if body.status.value == "Rejected" and body.rejection_reason:

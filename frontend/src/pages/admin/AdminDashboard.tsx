@@ -271,7 +271,7 @@ const AdminDashboard: React.FC = () => {
 
         const isUnavail = selectedRequest.request_type === 'unavailability';
 
-        if (!isUnavail && statusVal === 'Approved' && redFlag === 'Yes' && !redFlagReason) {
+        if (!isUnavail && statusVal === 'Approved' && redFlag === 'Exempted' && !redFlagReason) {
             setError('Red flag reason is required.');
             return;
         }
@@ -292,7 +292,7 @@ const AdminDashboard: React.FC = () => {
                     payload.payment_status = paymentStatus as any;
                     payload.class_added_on_class_day = classAddedOnDay || undefined;
                     payload.red_flag = redFlag as any;
-                    payload.red_flag_reason = redFlag === 'Yes' ? redFlagReason : undefined;
+                    payload.red_flag_reason = redFlag === 'Exempted' ? redFlagReason : undefined;
                 }
             }
 
