@@ -91,27 +91,44 @@ const AdminDashboard: React.FC = () => {
         // 3. Date Range Filter
         if (startDateFilter || endDateFilter) {
             const classDateStr = r.request_type === 'unavailability' 
-                ? r['Original Date of Class (MM/DD/YYYY)'] || r['date_of_class']
+                ? r['Original Date of Class (MM/DD/YYYY)'] || r['original_date_of_class'] || r['date_of_class']
                 : r['Date of Class (MM/DD/YYYY)'] || r['date_of_class'];
             
             if (!classDateStr) return false;
 
-            // Normalize classDateStr to YYYY-MM-DD for comparison
+            // Robust Normalization to YYYY-MM-DD
             let normalized = '';
-            const parts = String(classDateStr).split(/[\/\-]/);
-            if (parts.length === 3) {
-                let y, m, d;
-                if (parts[0].length === 4) { // YYYY-MM-DD
-                    [y, m, d] = parts;
-                } else if (parts[2].length === 4) { // MM/DD/YYYY
-                    [m, d, y] = parts;
-                } else if (parts[2].length === 2) { // MM/DD/YY
-                    [m, d, y] = parts;
-                    y = `20${y}`;
-                }
+            const s = String(classDateStr).trim();
+            
+            // Try YYYY-MM-DD or YYYY/MM/DD
+            let m = s.match(/^(\d{4})[\-\/](\d{1,2})[\-\/](\d{1,2})/);
+            if (m) {
+                normalized = `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+            } else {
+                // Try DD/MM/YYYY or MM/DD/YYYY
+                m = s.match(/^(\d{1,2})[\-\/](\d{1,2})[\-\/](\d{2,4})/);
+                if (m) {
+                    let p1 = parseInt(m[1]);
+                    let p2 = parseInt(m[2]);
+                    let year = m[3];
+                    if (year.length === 2) year = `20${year}`;
 
-                if (y && m && d) {
-                    normalized = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+                    // If p1 > 12, it MUST be DD/MM/YYYY
+                    // If p2 > 12, it MUST be MM/DD/YYYY
+                    // Default to DD/MM/YYYY for India if ambiguous
+                    if (p1 > 12) {
+                        normalized = `${year}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+                    } else if (p2 > 12) {
+                        normalized = `${year}-${m[1].padStart(2, '0')}-${m[2].padStart(2, '0')}`;
+                    } else {
+                        normalized = `${year}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+                    }
+                } else {
+                    // Fallback to JS Date parsing for strings like "12 May 2026"
+                    const d = new Date(s);
+                    if (!isNaN(d.getTime())) {
+                        normalized = d.toISOString().split('T')[0];
+                    }
                 }
             }
 
@@ -119,6 +136,9 @@ const AdminDashboard: React.FC = () => {
                 if (startDateFilter && normalized < startDateFilter) return false;
                 if (endDateFilter && normalized > endDateFilter) return false;
             } else {
+                // If we can't parse it at all, don't hide it unless both filters are set?
+                // Actually, let's just skip filtering for unparseable dates to be safe
+                // but for now let's try to be strict to see if it works.
                 return false; 
             }
         }
@@ -517,7 +537,14 @@ const AdminDashboard: React.FC = () => {
                     ) : displayedRequests.length === 0 ? (
                         <div className="empty-state">
                             <div className="empty-state-icon">—</div>
-                            <p className="empty-state-text">{paymentFilter ? 'No requests needing attention.' : `No ${filter === 'Pending' ? 'pending ' : ''}requests.`}</p>
+                                <p className="empty-state-text">
+                                    {paymentFilter 
+                                        ? 'No requests needing attention.' 
+                                        : (requestSearch || startDateFilter || endDateFilter)
+                                            ? 'No requests match your current filters.'
+                                            : `No ${filter === 'Pending' ? 'pending ' : ''}requests.`
+                                    }
+                                </p>
                         </div>
                     ) : (
                         displayedRequests.map((r, i) => {
