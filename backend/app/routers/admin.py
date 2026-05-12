@@ -160,7 +160,7 @@ async def update_request_status(
         if body.red_flag:
             updates["red_flag"] = body.red_flag.value
             if body.red_flag.value in ("Yes", "Exempted") and body.red_flag_reason:
-                updates["red_flag_proof"] = body.red_flag_reason
+                updates["slack_link"] = body.red_flag_reason
 
     if body.status.value == "Rejected" and body.rejection_reason:
         updates["rejection_reason"] = body.rejection_reason

@@ -44,7 +44,7 @@ const AdminDashboard: React.FC = () => {
     const [finalStatus, setFinalStatus] = useState('');
     const [replacementInstructor, setReplacementInstructor] = useState('');
     const [redFlagProof, setRedFlagProof] = useState('');
-    const [instructorOptions, setInstructorOptions] = useState<{name: string, email: string}[]>([]);
+    const [instructorOptions, setInstructorOptions] = useState<{ name: string, email: string }[]>([]);
     const [customInstructor, setCustomInstructor] = useState('');
 
     // Class addition-specific fields

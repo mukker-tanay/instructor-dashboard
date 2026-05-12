@@ -89,8 +89,8 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({ options, value,
 };
 
 const AdminManualUnavailability: React.FC = () => {
-    const [instructors, setInstructors] = useState<{name: string, email: string}[]>([]);
-    
+    const [instructors, setInstructors] = useState<{ name: string, email: string }[]>([]);
+
     // Form fields
     const [selectedInstructorDisplay, setSelectedInstructorDisplay] = useState('');
     const [program, setProgram] = useState('Academy');
@@ -116,7 +116,7 @@ const AdminManualUnavailability: React.FC = () => {
     const [success, setSuccess] = useState('');
 
     useEffect(() => {
-        getInstructorOptions().then(d => setInstructors(d.instructors)).catch(() => {});
+        getInstructorOptions().then(d => setInstructors(d.instructors)).catch(() => { });
     }, []);
 
     const resetForm = () => {
@@ -194,7 +194,7 @@ const AdminManualUnavailability: React.FC = () => {
                     : suggestedReplacement,
                 other_comments: otherComments
             };
-            
+
             await createAdminUnavailabilityRequest(payload);
             setSuccess('Unavailability request manually raised and Slack notification sent!');
             resetForm();
