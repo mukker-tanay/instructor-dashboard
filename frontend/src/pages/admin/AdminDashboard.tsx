@@ -9,6 +9,8 @@ const AdminDashboard: React.FC = () => {
     const [filter, setFilter] = useState<'Pending' | 'all'>('Pending');
     const [typeFilter, setTypeFilter] = useState<'all' | 'unavailability' | 'class_addition'>('all');
     const [loading, setLoading] = useState(true);
+    const [requestSearch, setRequestSearch] = useState('');
+    const [dateFilter, setDateFilter] = useState('');
     const [selectedRequest, setSelectedRequest] = useState<RequestItem | null>(null);
     const [showModal, setShowModal] = useState(false);
 
@@ -68,13 +70,49 @@ const AdminDashboard: React.FC = () => {
         }
     }, [filter, typeFilter]);
 
-    const displayedRequests = paymentFilter
-        ? requests.filter(r =>
-            r.request_type === 'class_addition' &&
-            String(r.status || r.Status || '').trim() === 'Approved' &&
-            ['Pending', 'To be Audited'].includes(String(r.payment_status || '').trim())
-        )
-        : requests;
+    const displayedRequests = requests.filter(r => {
+        // 1. Payment Filter
+        if (paymentFilter) {
+            const isApproved = String(r.status || r.Status || '').trim() === 'Approved';
+            const isAddition = r.request_type === 'class_addition';
+            const needsAudit = ['Pending', 'To be Audited'].includes(String(r.payment_status || '').trim());
+            if (!isAddition || !isApproved || !needsAudit) return false;
+        }
+
+        // 2. Instructor Search Filter
+        if (requestSearch) {
+            const query = requestSearch.toLowerCase();
+            const name = String(r['Instructor Name'] || '').toLowerCase();
+            const email = String(r['Instructor Email'] || '').toLowerCase();
+            if (!name.includes(query) && !email.includes(query)) return false;
+        }
+
+        // 3. Date Filter
+        if (dateFilter) {
+            // dateFilter is YYYY-MM-DD from <input type="date">
+            const classDateStr = r.request_type === 'unavailability' 
+                ? r['Original Date of Class (MM/DD/YYYY)'] || r['date_of_class']
+                : r['Date of Class (MM/DD/YYYY)'] || r['date_of_class'];
+            
+            if (!classDateStr) return false;
+
+            // Normalize classDateStr to YYYY-MM-DD for comparison
+            let normalized = '';
+            const parts = String(classDateStr).split(/[\/\-]/);
+            if (parts.length === 3) {
+                if (parts[0].length === 4) { // YYYY-MM-DD
+                    normalized = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+                } else if (parts[2].length === 4) { // MM/DD/YYYY
+                    normalized = `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
+                } else if (parts[2].length === 2) { // MM/DD/YY
+                    normalized = `20${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
+                }
+            }
+            if (normalized !== dateFilter) return false;
+        }
+
+        return true;
+    });
 
     const fetchInstructors = useCallback(async () => {
         setAccessLoading(true);
@@ -339,7 +377,7 @@ const AdminDashboard: React.FC = () => {
             {activeView === 'requests' ? (
                 <>
                     {/* Filters + Bulk Actions */}
-                    <div className="filters-bar" style={{ flexWrap: 'wrap', gap: 'var(--space-sm)' }}>
+                    <div className="filters-bar" style={{ flexWrap: 'wrap', gap: 'var(--space-sm)', alignItems: 'center' }}>
                         <div className="tabs" style={{ margin: 0 }}>
                             <button className={`tab ${filter === 'Pending' ? 'active' : ''}`} onClick={() => { setFilter('Pending'); setPaymentFilter(false); }}>Pending</button>
                             <button className={`tab ${filter === 'all' ? 'active' : ''}`} onClick={() => { setFilter('all'); setPaymentFilter(false); }}>All</button>
@@ -349,6 +387,46 @@ const AdminDashboard: React.FC = () => {
                             <button className={`tab ${typeFilter === 'unavailability' ? 'active' : ''}`} onClick={() => setTypeFilter('unavailability')}>Unavailability</button>
                             <button className={`tab ${typeFilter === 'class_addition' ? 'active' : ''}`} onClick={() => setTypeFilter('class_addition')}>Class Addition</button>
                         </div>
+
+                        {/* Search and Date Filters */}
+                        <div style={{ display: 'flex', gap: '8px', flex: '1 1 350px', minWidth: '280px' }}>
+                            <div style={{ position: 'relative', flex: 1 }}>
+                                <input
+                                    type="text"
+                                    className="form-input"
+                                    placeholder="Search instructor..."
+                                    value={requestSearch}
+                                    onChange={e => setRequestSearch(e.target.value)}
+                                    style={{ paddingLeft: '32px', margin: 0, height: '36px', fontSize: '0.875rem' }}
+                                />
+                                <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', opacity: 0.5, pointerEvents: 'none' }}>🔍</span>
+                                {requestSearch && (
+                                    <button 
+                                        onClick={() => setRequestSearch('')}
+                                        style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.2rem', lineHeight: 1 }}
+                                    >
+                                        ×
+                                    </button>
+                                )}
+                            </div>
+                            <input
+                                type="date"
+                                className="form-input"
+                                value={dateFilter}
+                                onChange={e => setDateFilter(e.target.value)}
+                                style={{ width: '130px', margin: 0, height: '36px', fontSize: '0.8125rem' }}
+                            />
+                            {(requestSearch || dateFilter) && (
+                                <button 
+                                    className="btn btn-secondary btn-sm"
+                                    onClick={() => { setRequestSearch(''); setDateFilter(''); }}
+                                    style={{ height: '36px', padding: '0 12px', fontSize: '0.75rem', whiteSpace: 'nowrap', border: '1px solid var(--border)' }}
+                                >
+                                    Reset
+                                </button>
+                            )}
+                        </div>
+
                         <button
                             className="btn btn-danger btn-sm"
                             onClick={() => { setPaymentFilter(p => !p); setFilter('all'); setTypeFilter('all'); }}
