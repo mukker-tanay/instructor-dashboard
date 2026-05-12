@@ -10,7 +10,8 @@ const AdminDashboard: React.FC = () => {
     const [typeFilter, setTypeFilter] = useState<'all' | 'unavailability' | 'class_addition'>('all');
     const [loading, setLoading] = useState(true);
     const [requestSearch, setRequestSearch] = useState('');
-    const [dateFilter, setDateFilter] = useState('');
+    const [startDateFilter, setStartDateFilter] = useState('');
+    const [endDateFilter, setEndDateFilter] = useState('');
     const [selectedRequest, setSelectedRequest] = useState<RequestItem | null>(null);
     const [showModal, setShowModal] = useState(false);
 
@@ -87,9 +88,8 @@ const AdminDashboard: React.FC = () => {
             if (!name.includes(query) && !email.includes(query)) return false;
         }
 
-        // 3. Date Filter
-        if (dateFilter) {
-            // dateFilter is YYYY-MM-DD from <input type="date">
+        // 3. Date Range Filter
+        if (startDateFilter || endDateFilter) {
             const classDateStr = r.request_type === 'unavailability' 
                 ? r['Original Date of Class (MM/DD/YYYY)'] || r['date_of_class']
                 : r['Date of Class (MM/DD/YYYY)'] || r['date_of_class'];
@@ -100,15 +100,27 @@ const AdminDashboard: React.FC = () => {
             let normalized = '';
             const parts = String(classDateStr).split(/[\/\-]/);
             if (parts.length === 3) {
+                let y, m, d;
                 if (parts[0].length === 4) { // YYYY-MM-DD
-                    normalized = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+                    [y, m, d] = parts;
                 } else if (parts[2].length === 4) { // MM/DD/YYYY
-                    normalized = `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
+                    [m, d, y] = parts;
                 } else if (parts[2].length === 2) { // MM/DD/YY
-                    normalized = `20${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
+                    [m, d, y] = parts;
+                    y = `20${y}`;
+                }
+
+                if (y && m && d) {
+                    normalized = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
                 }
             }
-            if (normalized !== dateFilter) return false;
+
+            if (normalized) {
+                if (startDateFilter && normalized < startDateFilter) return false;
+                if (endDateFilter && normalized > endDateFilter) return false;
+            } else {
+                return false; 
+            }
         }
 
         return true;
@@ -377,63 +389,88 @@ const AdminDashboard: React.FC = () => {
             {activeView === 'requests' ? (
                 <>
                     {/* Filters + Bulk Actions */}
-                    <div className="filters-bar" style={{ flexWrap: 'wrap', gap: 'var(--space-sm)', alignItems: 'center' }}>
-                        <div className="tabs" style={{ margin: 0 }}>
-                            <button className={`tab ${filter === 'Pending' ? 'active' : ''}`} onClick={() => { setFilter('Pending'); setPaymentFilter(false); }}>Pending</button>
-                            <button className={`tab ${filter === 'all' ? 'active' : ''}`} onClick={() => { setFilter('all'); setPaymentFilter(false); }}>All</button>
-                        </div>
-                        <div className="tabs" style={{ margin: 0 }}>
-                            <button className={`tab ${typeFilter === 'all' ? 'active' : ''}`} onClick={() => setTypeFilter('all')}>All Types</button>
-                            <button className={`tab ${typeFilter === 'unavailability' ? 'active' : ''}`} onClick={() => setTypeFilter('unavailability')}>Unavailability</button>
-                            <button className={`tab ${typeFilter === 'class_addition' ? 'active' : ''}`} onClick={() => setTypeFilter('class_addition')}>Class Addition</button>
+                    <div className="filters-bar" style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '20px' }}>
+                        {/* Row 1: Primary Filters */}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-sm)', alignItems: 'center', width: '100%' }}>
+                            <div className="tabs" style={{ margin: 0 }}>
+                                <button className={`tab ${filter === 'Pending' ? 'active' : ''}`} onClick={() => { setFilter('Pending'); setPaymentFilter(false); }}>Pending</button>
+                                <button className={`tab ${filter === 'all' ? 'active' : ''}`} onClick={() => { setFilter('all'); setPaymentFilter(false); }}>All</button>
+                            </div>
+                            <div className="tabs" style={{ margin: 0 }}>
+                                <button className={`tab ${typeFilter === 'all' ? 'active' : ''}`} onClick={() => setTypeFilter('all')}>All Types</button>
+                                <button className={`tab ${typeFilter === 'unavailability' ? 'active' : ''}`} onClick={() => setTypeFilter('unavailability')}>Unavailability</button>
+                                <button className={`tab ${typeFilter === 'class_addition' ? 'active' : ''}`} onClick={() => setTypeFilter('class_addition')}>Class Addition</button>
+                            </div>
+                            <button
+                                className="btn btn-danger btn-sm"
+                                onClick={() => { setPaymentFilter(p => !p); setFilter('all'); setTypeFilter('all'); }}
+                                style={{ marginLeft: 'auto', whiteSpace: 'nowrap', opacity: paymentFilter ? 1 : 0.75 }}
+                            >
+                                {paymentFilter ? 'Pending Payment Status ✕' : 'Pending Payment Status'}
+                            </button>
                         </div>
 
-                        {/* Search and Date Filters */}
-                        <div style={{ display: 'flex', gap: '8px', flex: '1 1 350px', minWidth: '280px' }}>
-                            <div style={{ position: 'relative', flex: 1 }}>
+                        {/* Row 2: Search and Date Range */}
+                        <div style={{ 
+                            display: 'flex', 
+                            flexWrap: 'wrap', 
+                            gap: '12px', 
+                            alignItems: 'center', 
+                            width: '100%', 
+                            padding: '12px 16px', 
+                            background: 'var(--surface-elevated, #f8f9fa)', 
+                            borderRadius: 'var(--radius-md, 8px)',
+                            border: '1px solid var(--border-subtle, #e2e8f0)'
+                        }}>
+                            <div style={{ position: 'relative', flex: '1 1 300px', minWidth: '250px' }}>
                                 <input
                                     type="text"
                                     className="form-input"
-                                    placeholder="Search instructor..."
+                                    placeholder="Search instructor name or email..."
                                     value={requestSearch}
                                     onChange={e => setRequestSearch(e.target.value)}
-                                    style={{ paddingLeft: '32px', margin: 0, height: '36px', fontSize: '0.875rem' }}
+                                    style={{ paddingLeft: '32px', margin: 0, height: '38px', fontSize: '0.875rem' }}
                                 />
                                 <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', opacity: 0.5, pointerEvents: 'none' }}>🔍</span>
                                 {requestSearch && (
                                     <button 
                                         onClick={() => setRequestSearch('')}
-                                        style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.2rem', lineHeight: 1 }}
+                                        style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.1rem', lineHeight: 1 }}
                                     >
                                         ×
                                     </button>
                                 )}
                             </div>
-                            <input
-                                type="date"
-                                className="form-input"
-                                value={dateFilter}
-                                onChange={e => setDateFilter(e.target.value)}
-                                style={{ width: '130px', margin: 0, height: '36px', fontSize: '0.8125rem' }}
-                            />
-                            {(requestSearch || dateFilter) && (
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', fontWeight: 600 }}>From:</span>
+                                <input
+                                    type="date"
+                                    className="form-input"
+                                    value={startDateFilter}
+                                    onChange={e => setStartDateFilter(e.target.value)}
+                                    style={{ width: '140px', margin: 0, height: '38px', fontSize: '0.8125rem', padding: '0 8px' }}
+                                />
+                                <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', fontWeight: 600 }}>To:</span>
+                                <input
+                                    type="date"
+                                    className="form-input"
+                                    value={endDateFilter}
+                                    onChange={e => setEndDateFilter(e.target.value)}
+                                    style={{ width: '140px', margin: 0, height: '38px', fontSize: '0.8125rem', padding: '0 8px' }}
+                                />
+                            </div>
+
+                            {(requestSearch || startDateFilter || endDateFilter) && (
                                 <button 
                                     className="btn btn-secondary btn-sm"
-                                    onClick={() => { setRequestSearch(''); setDateFilter(''); }}
-                                    style={{ height: '36px', padding: '0 12px', fontSize: '0.75rem', whiteSpace: 'nowrap', border: '1px solid var(--border)' }}
+                                    onClick={() => { setRequestSearch(''); setStartDateFilter(''); setEndDateFilter(''); }}
+                                    style={{ height: '38px', padding: '0 16px', fontSize: '0.8125rem', border: '1px solid var(--border-light)', background: 'var(--bg-card)' }}
                                 >
-                                    Reset
+                                    Reset Filters
                                 </button>
                             )}
                         </div>
-
-                        <button
-                            className="btn btn-danger btn-sm"
-                            onClick={() => { setPaymentFilter(p => !p); setFilter('all'); setTypeFilter('all'); }}
-                            style={{ marginLeft: 'auto', whiteSpace: 'nowrap', opacity: paymentFilter ? 1 : 0.75 }}
-                        >
-                            {paymentFilter ? 'Pending Payment Status ✕' : 'Pending Payment Status'}
-                        </button>
                     </div>
 
                     {/* Bulk action bar — visible when requests exist */}
