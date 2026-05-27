@@ -36,7 +36,8 @@ const AdminDashboard: React.FC = () => {
 
     // Modules Modal State
     const [modulesModalEmail, setModulesModalEmail] = useState<string | null>(null);
-    const [modulesModalValue, setModulesModalValue] = useState<string>('');
+    const [modulesModalModules, setModulesModalModules] = useState<string[]>([]);
+    const [moduleInput, setModuleInput] = useState('');
 
     // Selection state for bulk delete
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -234,10 +235,9 @@ const AdminDashboard: React.FC = () => {
         if (!modulesModalEmail) return;
         try {
             setSubmitting(true);
-            const moduleArray = modulesModalValue.split(',').map(m => m.trim()).filter(Boolean);
-            await updateAllowedInstructorModules(modulesModalEmail, moduleArray);
+            await updateAllowedInstructorModules(modulesModalEmail, modulesModalModules);
             setModulesModalEmail(null);
-            setModulesModalValue('');
+            setModulesModalModules([]);
             fetchInstructors();
         } catch (err: any) {
             alert(err.response?.data?.detail || 'Failed to update modules');
@@ -887,7 +887,8 @@ const AdminDashboard: React.FC = () => {
                                                 className="btn btn-secondary btn-sm"
                                                 onClick={() => {
                                                     setModulesModalEmail(inst.email);
-                                                    setModulesModalValue(inst.modules ? inst.modules.join(', ') : '');
+                                                    setModulesModalModules(inst.modules ? [...inst.modules] : []);
+                                                    setModuleInput('');
                                                 }}
                                                 style={{ padding: '4px 12px', fontSize: '0.75rem' }}
                                             >
@@ -1030,19 +1031,62 @@ const AdminDashboard: React.FC = () => {
                             Update module mapping for <strong>{modulesModalEmail}</strong>. This dictates which modules this instructor can teach or be a backup for.
                         </p>
                         <div className="form-group">
-                            <label className="form-label">Modules (comma separated)</label>
-                            <input
-                                type="text"
-                                className="form-input"
-                                placeholder="Module A, Module B..."
-                                value={modulesModalValue}
-                                onChange={e => setModulesModalValue(e.target.value)}
-                            />
-                            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '6px' }}>
-                                Leave blank if they don't have specific modules mapped.
-                            </p>
+                            <label className="form-label">Mapped Modules</label>
+                            
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' }}>
+                                {modulesModalModules.map((mod, idx) => (
+                                    <div key={idx} style={{
+                                        display: 'flex', alignItems: 'center', gap: '6px', 
+                                        background: '#e6f4ea', color: '#137333', border: '1px solid #ceead6',
+                                        padding: '4px 12px', borderRadius: '16px', fontSize: '0.875rem', fontWeight: 600
+                                    }}>
+                                        {mod}
+                                        <button 
+                                            onClick={() => setModulesModalModules(prev => prev.filter((_, i) => i !== idx))}
+                                            style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', padding: '0 0 0 4px', display: 'flex', alignItems: 'center', fontSize: '1rem', opacity: 0.7 }}
+                                            title="Remove module"
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+                                ))}
+                                {modulesModalModules.length === 0 && (
+                                    <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>No modules mapped yet.</span>
+                                )}
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <input
+                                    type="text"
+                                    className="form-input"
+                                    placeholder="Add a module..."
+                                    value={moduleInput}
+                                    onChange={e => setModuleInput(e.target.value)}
+                                    onKeyDown={e => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            if (moduleInput.trim() && !modulesModalModules.includes(moduleInput.trim())) {
+                                                setModulesModalModules(prev => [...prev, moduleInput.trim()]);
+                                                setModuleInput('');
+                                            }
+                                        }
+                                    }}
+                                />
+                                <button 
+                                    className="btn btn-secondary" 
+                                    type="button"
+                                    onClick={() => {
+                                        if (moduleInput.trim() && !modulesModalModules.includes(moduleInput.trim())) {
+                                            setModulesModalModules(prev => [...prev, moduleInput.trim()]);
+                                            setModuleInput('');
+                                        }
+                                    }}
+                                >
+                                    Add
+                                </button>
+                            </div>
                         </div>
-                        <div className="modal-actions">
+                        <div className="modal-actions" style={{ marginTop: '24px' }}>
                             <button className="btn btn-secondary" onClick={() => setModulesModalEmail(null)}>Cancel</button>
                             <button className="btn btn-primary" onClick={handleUpdateModules} disabled={submitting}>
                                 {submitting ? 'Saving...' : 'Save Modules'}
