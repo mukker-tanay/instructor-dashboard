@@ -228,10 +228,15 @@ async def delete_requests(
 
 class AllowedInstructorCreate(BaseModel):
     emails: List[str]
+    modules: List[str] = []
 
 class AllowedInstructorAliasUpdate(BaseModel):
     email: str
     alias_email: str | None = None
+
+class AllowedInstructorModulesUpdate(BaseModel):
+    email: str
+    modules: List[str]
 
 
 @router.get("/instructors")
@@ -258,7 +263,7 @@ async def add_allowed_instructor(
 
     try:
         # We use an upsert just in case it already exists so it doesn't fail fatally
-        payload = [{"email": email, "added_by": admin.email} for email in valid_emails]
+        payload = [{"email": email, "added_by": admin.email, "modules": body.modules} for email in valid_emails]
         supabase.table("allowed_instructors").upsert(payload, on_conflict="email").execute()
         return {"message": f"Successfully granted access to {len(valid_emails)} instructor(s)"}
     except Exception as e:
@@ -281,6 +286,22 @@ async def update_allowed_instructor_alias(
     except Exception as e:
         logger.error(f"Failed to update alias for {email}: {e}")
         raise HTTPException(status_code=500, detail="Failed to update alias")
+
+
+@router.post("/instructors/modules")
+async def update_allowed_instructor_modules(
+    body: AllowedInstructorModulesUpdate,
+    admin: UserInfo = Depends(require_admin)
+):
+    """Update mapped modules for an allowed instructor."""
+    email = body.email.strip().lower()
+    
+    try:
+        supabase.table("allowed_instructors").update({"modules": body.modules}).eq("email", email).execute()
+        return {"message": f"Modules updated for {email}"}
+    except Exception as e:
+        logger.error(f"Failed to update modules for {email}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update modules")
 
 
 @router.delete("/instructors")

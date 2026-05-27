@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getAdminRequests, updateRequestStatus, getInstructorOptions, deleteRequests, getAllowedInstructors, addAllowedInstructor, removeAllowedInstructor, updateAllowedInstructorAlias, getLocoUsers, addLocoUser, removeLocoUser } from '../../api/client';
+import { getAdminRequests, updateRequestStatus, getInstructorOptions, deleteRequests, getAllowedInstructors, addAllowedInstructor, removeAllowedInstructor, updateAllowedInstructorAlias, updateAllowedInstructorModules, getLocoUsers, addLocoUser, removeLocoUser } from '../../api/client';
 import type { RequestItem, StatusUpdate } from '../../types';
 import Modal from '../../components/Modal';
 import AdminManualUnavailability from './AdminManualUnavailability';
@@ -19,7 +19,7 @@ const AdminDashboard: React.FC = () => {
     const [activeView, setActiveView] = useState<'requests' | 'access' | 'loco' | 'manual'>('requests');
 
     // Access Control state
-    const [instructors, setInstructors] = useState<{ email: string; added_by?: string; added_at?: string; alias_email?: string }[]>([]);
+    const [instructors, setInstructors] = useState<{ email: string; added_by?: string; added_at?: string; alias_email?: string; modules?: string[] }[]>([]);
     const [newInstructorEmail, setNewInstructorEmail] = useState('');
     const [instructorSearch, setInstructorSearch] = useState('');
     const [accessLoading, setAccessLoading] = useState(false);
@@ -33,6 +33,10 @@ const AdminDashboard: React.FC = () => {
     // Alias Modal State
     const [aliasModalEmail, setAliasModalEmail] = useState<string | null>(null);
     const [aliasModalValue, setAliasModalValue] = useState('');
+
+    // Modules Modal State
+    const [modulesModalEmail, setModulesModalEmail] = useState<string | null>(null);
+    const [modulesModalValue, setModulesModalValue] = useState<string>('');
 
     // Selection state for bulk delete
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -221,6 +225,22 @@ const AdminDashboard: React.FC = () => {
             fetchInstructors();
         } catch (err: any) {
             alert(err.response?.data?.detail || 'Failed to update alias');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleUpdateModules = async () => {
+        if (!modulesModalEmail) return;
+        try {
+            setSubmitting(true);
+            const moduleArray = modulesModalValue.split(',').map(m => m.trim()).filter(Boolean);
+            await updateAllowedInstructorModules(modulesModalEmail, moduleArray);
+            setModulesModalEmail(null);
+            setModulesModalValue('');
+            fetchInstructors();
+        } catch (err: any) {
+            alert(err.response?.data?.detail || 'Failed to update modules');
         } finally {
             setSubmitting(false);
         }
@@ -858,8 +878,21 @@ const AdminDashboard: React.FC = () => {
                                             ) : (
                                                 <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '4px' }}>No alias</div>
                                             )}
+                                            <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                                                Modules: <span style={{ fontWeight: 500 }}>{inst.modules && inst.modules.length > 0 ? inst.modules.join(', ') : <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>None assigned</span>}</span>
+                                            </div>
                                         </div>
                                         <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                                            <button
+                                                className="btn btn-secondary btn-sm"
+                                                onClick={() => {
+                                                    setModulesModalEmail(inst.email);
+                                                    setModulesModalValue(inst.modules ? inst.modules.join(', ') : '');
+                                                }}
+                                                style={{ padding: '4px 12px', fontSize: '0.75rem' }}
+                                            >
+                                                Edit Modules
+                                            </button>
                                             <button
                                                 className="btn btn-secondary btn-sm"
                                                 onClick={() => {
@@ -979,6 +1012,40 @@ const AdminDashboard: React.FC = () => {
                             <button className="btn btn-secondary" onClick={() => setAliasModalEmail(null)}>Cancel</button>
                             <button className="btn btn-primary" onClick={handleUpdateAlias} disabled={submitting}>
                                 {submitting ? 'Saving...' : 'Save Alias'}
+                            </button>
+                        </div>
+                    </>
+                )}
+            </Modal>
+
+            {/* Modules Modal */}
+            <Modal
+                isOpen={!!modulesModalEmail}
+                onClose={() => setModulesModalEmail(null)}
+                title="Update Instructor Modules"
+            >
+                {modulesModalEmail && (
+                    <>
+                        <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
+                            Update module mapping for <strong>{modulesModalEmail}</strong>. This dictates which modules this instructor can teach or be a backup for.
+                        </p>
+                        <div className="form-group">
+                            <label className="form-label">Modules (comma separated)</label>
+                            <input
+                                type="text"
+                                className="form-input"
+                                placeholder="Module A, Module B..."
+                                value={modulesModalValue}
+                                onChange={e => setModulesModalValue(e.target.value)}
+                            />
+                            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '6px' }}>
+                                Leave blank if they don't have specific modules mapped.
+                            </p>
+                        </div>
+                        <div className="modal-actions">
+                            <button className="btn btn-secondary" onClick={() => setModulesModalEmail(null)}>Cancel</button>
+                            <button className="btn btn-primary" onClick={handleUpdateModules} disabled={submitting}>
+                                {submitting ? 'Saving...' : 'Save Modules'}
                             </button>
                         </div>
                     </>

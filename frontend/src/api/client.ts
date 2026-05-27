@@ -72,13 +72,16 @@ export const deleteRequests = (requestIds: string[]) =>
     api.post<{ message: string; deleted: number; errors: string[] }>('/admin/requests/delete', { request_ids: requestIds }).then(r => r.data);
 
 export const getAllowedInstructors = () =>
-    api.get<{ instructors: { email: string; added_by?: string; added_at?: string }[] }>('/admin/instructors').then(r => r.data);
+    api.get<{ instructors: { email: string; added_by?: string; added_at?: string; modules?: string[] }[] }>('/admin/instructors').then(r => r.data);
 
-export const addAllowedInstructor = (emails: string[]) =>
-    api.post<{ message: string }>('/admin/instructors', { emails }).then(r => r.data);
+export const addAllowedInstructor = (emails: string[], modules: string[] = []) =>
+    api.post<{ message: string }>('/admin/instructors', { emails, modules }).then(r => r.data);
 
 export const updateAllowedInstructorAlias = (email: string, alias_email: string) =>
     api.post<{ message: string }>('/admin/instructors/alias', { email, alias_email }).then(r => r.data);
+
+export const updateAllowedInstructorModules = (email: string, modules: string[]) =>
+    api.post<{ message: string }>('/admin/instructors/modules', { email, modules }).then(r => r.data);
 
 export const removeAllowedInstructor = (email: string) =>
     api.delete<{ message: string }>(`/admin/instructors?email=${encodeURIComponent(email)}`).then(r => r.data);
