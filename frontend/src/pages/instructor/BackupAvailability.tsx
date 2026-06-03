@@ -10,10 +10,10 @@ import type { BackupAvailability, SlotPreference } from '../../types';
 
 /* ─── Constants ─── */
 const MONTH_NAMES = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
+    'January','February','March','April','May','June',
+    'July','August','September','October','November','December',
 ];
-const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
 const PREF_OPTIONS: { value: SlotPreference['general_preference']; label: string; emoji: string; desc: string }[] = [
     { value: 'morning', label: 'Morning', emoji: '🌅', desc: 'e.g. 7 AM – 12 PM' },
@@ -23,86 +23,72 @@ const PREF_OPTIONS: { value: SlotPreference['general_preference']; label: string
 ];
 
 /* ─── Helpers ─── */
-const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
-const getFirstDayOfMonth = (year: number, month: number) => new Date(year, month, 1).getDay();
-const toISO = (year: number, month: number, day: number) =>
-    `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+const getDaysInMonth = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
+const getFirstDay    = (y: number, m: number) => new Date(y, m, 1).getDay();
+const toISO = (y: number, m: number, d: number) =>
+    `${y}-${String(m + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
 
-/** Normalise a class_date string (MM/DD/YYYY, MM/DD/YY, YYYY-MM-DD) → YYYY-MM-DD */
 const normDate = (raw: string): string => {
     const s = String(raw || '').trim();
     if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
     const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
     if (m) {
         const yr = m[3].length === 2 ? `20${m[3]}` : m[3];
-        return `${yr}-${m[1].padStart(2, '0')}-${m[2].padStart(2, '0')}`;
+        return `${yr}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`;
     }
     return '';
 };
 
-/** Determine morning vs evening from a time string like "7:00 AM", "06:30 PM" */
 const timeToSlot = (raw: string): 'morning' | 'evening' | null => {
     const s = String(raw || '').toUpperCase().trim();
     if (!s) return null;
     if (s.includes('AM')) return 'morning';
-    if (s.includes('PM')) {
-        // 12:xx PM is noon → morning-ish, but we'll call it evening to be safe
-        // Let backend decide; all PM → evening
-        return 'evening';
-    }
-    // 24-h format fallback
+    if (s.includes('PM')) return 'evening';
     const hm = s.match(/^(\d{1,2}):/);
-    if (hm) {
-        const h = parseInt(hm[1], 10);
-        return h < 14 ? 'morning' : 'evening';
-    }
+    if (hm) return parseInt(hm[1], 10) < 14 ? 'morning' : 'evening';
     return null;
 };
 
-const fmtHeader = (iso: string): string => {
+const fmtShort = (iso: string): string => {
     const [y, m, d] = iso.split('-').map(Number);
-    return `${MONTH_NAMES[m - 1]} ${d}, ${y}`;
+    return `${MONTH_NAMES[m-1].slice(0,3)} ${d}, ${y}`;
 };
 
-const slotLabel = (slot: string) => {
-    if (slot === 'morning') return '🌅 Morning';
-    if (slot === 'evening') return '🌇 Evening';
-    if (slot === 'both')    return '🔄 Both';
-    return slot;
-};
+const slotLabel = (slot: string) =>
+    slot === 'morning' ? '🌅 Morning' : slot === 'evening' ? '🌇 Evening' : slot === 'both' ? '🔄 Both' : slot;
 
 /* ─── Component ─── */
 const BackupAvailability: React.FC = () => {
-    const todayISO = new Date().toISOString().split('T')[0];
+    const todayISO  = new Date().toISOString().split('T')[0];
     const todayDate = new Date();
 
     /* Preference */
     const [preference, setPreference] = useState<SlotPreference['general_preference']>('none');
-    const [prefNotes, setPrefNotes]   = useState('');
+    const [prefNotes,  setPrefNotes]  = useState('');
     const [prefSaving, setPrefSaving] = useState(false);
     const [prefSaved,  setPrefSaved]  = useState(false);
 
     /* Standby list */
     const [standbySlots, setStandbySlots] = useState<BackupAvailability[]>([]);
-    const [loading,       setLoading]     = useState(true);
-    const [deletingId,    setDeletingId]  = useState<string | null>(null);
+    const [loading,      setLoading]      = useState(true);
+    const [deletingId,   setDeletingId]   = useState<string | null>(null);
 
-    /* Class map: dateISO → ('morning' | 'evening')[] */
-    const [classMap, setClassMap] = useState<Record<string, ('morning' | 'evening')[]>>({});
+    /* classMap: dateISO → ('morning'|'evening')[] */
+    const [classMap, setClassMap] = useState<Record<string, ('morning'|'evening')[]>>({});
 
     /* Calendar nav */
     const [viewYear,  setViewYear]  = useState(todayDate.getFullYear());
     const [viewMonth, setViewMonth] = useState(todayDate.getMonth());
 
-    /* Day popup */
-    const [popupDay,        setPopupDay]        = useState<string | null>(null);
-    const [popupSlot,       setPopupSlot]       = useState<'morning' | 'evening' | 'both'>('morning');
-    const [popupNotes,      setPopupNotes]      = useState('');
-    const [popupSubmitting, setPopupSubmitting] = useState(false);
-    const [popupError,      setPopupError]      = useState('');
-    const [popupSuccess,    setPopupSuccess]    = useState('');
+    /* Multi-select */
+    const [selectedDays,    setSelectedDays]    = useState<Set<string>>(new Set());
+    const [panelSlot,       setPanelSlot]       = useState<'morning'|'evening'|'both'>('morning');
+    const [panelNotes,      setPanelNotes]      = useState('');
+    const [panelSubmitting, setPanelSubmitting] = useState(false);
+    const [panelResult,     setPanelResult]     = useState<{ created: number; skipped: number } | null>(null);
+    const [panelError,      setPanelError]      = useState('');
 
-    /* ─── Data fetch ─── */
+    /* ─── Fetch ─── */
     const fetchData = useCallback(async () => {
         setLoading(true);
         try {
@@ -110,15 +96,13 @@ const BackupAvailability: React.FC = () => {
                 getAvailabilityMe(),
                 getClasses('upcoming', 100, 0),
             ]);
-
             if (availData.preferences) {
                 setPreference(availData.preferences.general_preference || 'none');
                 setPrefNotes(availData.preferences.notes || '');
             }
             setStandbySlots(availData.standby_slots || []);
 
-            /* Build classMap */
-            const map: Record<string, ('morning' | 'evening')[]> = {};
+            const map: Record<string, ('morning'|'evening')[]> = {};
             for (const cls of classData.classes) {
                 const dateISO = normDate(cls.class_date);
                 if (!dateISO) continue;
@@ -140,20 +124,17 @@ const BackupAvailability: React.FC = () => {
     /* ─── Preference save ─── */
     const handleSavePref = async (newPref: SlotPreference['general_preference']) => {
         setPreference(newPref);
-        setPrefSaving(true);
-        setPrefSaved(false);
+        setPrefSaving(true); setPrefSaved(false);
         try {
             await updateSlotPreferences({ general_preference: newPref, notes: prefNotes });
             setPrefSaved(true);
             setTimeout(() => setPrefSaved(false), 2500);
         } catch (err) {
             console.error('Failed to save preference', err);
-        } finally {
-            setPrefSaving(false);
-        }
+        } finally { setPrefSaving(false); }
     };
 
-    /* ─── Calendar helpers ─── */
+    /* ─── Calendar nav ─── */
     const prevMonth = () => {
         if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11); }
         else setViewMonth(m => m - 1);
@@ -163,47 +144,83 @@ const BackupAvailability: React.FC = () => {
         else setViewMonth(m => m + 1);
     };
 
-    const getDayStandby = (iso: string) =>
-        standbySlots.filter(s => iso >= s.start_date && iso <= s.end_date);
-
-    /* ─── Day click ─── */
-    const handleDayClick = (iso: string) => {
-        if (iso < todayISO) return;
-        const blocked = classMap[iso] || [];
-        // Pick first available slot
-        let defaultSlot: 'morning' | 'evening' | 'both' = 'morning';
-        if (blocked.includes('morning') && !blocked.includes('evening')) defaultSlot = 'evening';
-        else if (!blocked.includes('morning')) defaultSlot = 'morning';
-        else defaultSlot = 'both';
-
-        setPopupDay(iso);
-        setPopupSlot(defaultSlot);
-        setPopupNotes('');
-        setPopupError('');
-        setPopupSuccess('');
+    /* ─── Day toggle ─── */
+    const isFullyBlocked = (iso: string) => {
+        const b = classMap[iso] || [];
+        return b.includes('morning') && b.includes('evening');
     };
 
-    /* ─── Submit standby ─── */
-    const handlePopupSubmit = async () => {
-        if (!popupDay) return;
-        setPopupError('');
-        setPopupSuccess('');
-        setPopupSubmitting(true);
-        try {
-            await createStandbySlot({
-                start_date: popupDay,
-                end_date:   popupDay,
-                slot:       popupSlot,
-                notes:      popupNotes.trim(),
-            });
-            setPopupSuccess('✅ Opted-in as backup for this date!');
-            fetchData();
-            setTimeout(() => { setPopupDay(null); setPopupSuccess(''); }, 1800);
-        } catch (err: any) {
-            setPopupError(err.response?.data?.detail || 'Failed to add standby slot.');
-        } finally {
-            setPopupSubmitting(false);
-        }
+    const toggleDay = (iso: string) => {
+        if (iso < todayISO || isFullyBlocked(iso)) return;
+        setSelectedDays(prev => {
+            const next = new Set(prev);
+            if (next.has(iso)) next.delete(iso); else next.add(iso);
+            return next;
+        });
+        setPanelResult(null);
+        setPanelError('');
+    };
+
+    const clearSelection = () => {
+        setSelectedDays(new Set());
+        setPanelResult(null);
+        setPanelError('');
+    };
+
+    /* ─── Panel slot availability across selected days ─── */
+    const slotBlockedOnAll = (slot: 'morning'|'evening'|'both'): boolean => {
+        if (selectedDays.size === 0) return false;
+        return [...selectedDays].every(iso => {
+            const b = classMap[iso] || [];
+            if (slot === 'morning') return b.includes('morning');
+            if (slot === 'evening') return b.includes('evening');
+            return b.length > 0; // 'both' blocked if any class
+        });
+    };
+
+    const blockedForSlot = (iso: string, slot: 'morning'|'evening'|'both'): boolean => {
+        const b = classMap[iso] || [];
+        if (slot === 'morning') return b.includes('morning');
+        if (slot === 'evening') return b.includes('evening');
+        return b.length > 0;
+    };
+
+    const skippedCount = [...selectedDays].filter(iso => blockedForSlot(iso, panelSlot)).length;
+    const availableCount = selectedDays.size - skippedCount;
+
+    /* ─── Submit ─── */
+    const handleSubmit = async () => {
+        if (availableCount === 0) return;
+        setPanelSubmitting(true);
+        setPanelError('');
+        setPanelResult(null);
+
+        const daysToCreate = [...selectedDays].filter(iso => !blockedForSlot(iso, panelSlot));
+        let created = 0;
+        const errors: string[] = [];
+
+        await Promise.all(
+            daysToCreate.map(async iso => {
+                try {
+                    await createStandbySlot({ start_date: iso, end_date: iso, slot: panelSlot, notes: panelNotes.trim() });
+                    created++;
+                } catch (err: any) {
+                    errors.push(err.response?.data?.detail || iso);
+                }
+            })
+        );
+
+        if (errors.length) setPanelError(`Some slots failed: ${errors.join(', ')}`);
+        setPanelResult({ created, skipped: skippedCount + errors.length });
+        setPanelSubmitting(false);
+        setPanelNotes('');
+        fetchData();
+
+        // Clear selection after short delay
+        setTimeout(() => {
+            setSelectedDays(new Set());
+            setPanelResult(null);
+        }, 2500);
     };
 
     /* ─── Delete slot ─── */
@@ -215,9 +232,7 @@ const BackupAvailability: React.FC = () => {
             setStandbySlots(prev => prev.filter(s => s.id !== slotId));
         } catch (err: any) {
             alert(err.response?.data?.detail || 'Failed to remove standby slot.');
-        } finally {
-            setDeletingId(null);
-        }
+        } finally { setDeletingId(null); }
     };
 
     /* ─── Loading ─── */
@@ -229,22 +244,21 @@ const BackupAvailability: React.FC = () => {
         );
     }
 
-    /* ─── Calendar grid ─── */
+    /* ─── Calendar grid data ─── */
     const daysInMonth = getDaysInMonth(viewYear, viewMonth);
-    const firstDay    = getFirstDayOfMonth(viewYear, viewMonth);
+    const firstDay    = getFirstDay(viewYear, viewMonth);
     const gridCells: (number | null)[] = [
         ...Array(firstDay).fill(null),
         ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
     ];
     while (gridCells.length % 7 !== 0) gridCells.push(null);
 
-    const popupBlocked = popupDay ? (classMap[popupDay] || []) : [];
-    const allBlocked   = popupBlocked.includes('morning') && popupBlocked.includes('evening');
+    const getDayStandby = (iso: string) =>
+        standbySlots.filter(s => iso >= s.start_date && iso <= s.end_date);
 
     /* ─── Render ─── */
     return (
         <div className="page-container">
-            {/* Header */}
             <div className="page-header">
                 <h1 className="page-title">Backup &amp; Availability</h1>
                 <p className="page-subtitle">
@@ -264,21 +278,16 @@ const BackupAvailability: React.FC = () => {
                 </p>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(155px, 1fr))', gap: '12px' }}>
                     {PREF_OPTIONS.map(opt => (
-                        <button
-                            key={opt.value}
-                            onClick={() => handleSavePref(opt.value)}
-                            disabled={prefSaving}
+                        <button key={opt.value} onClick={() => handleSavePref(opt.value)} disabled={prefSaving}
                             style={{
                                 display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px',
                                 padding: '14px 16px', borderRadius: 'var(--radius-md)',
                                 border: `2px solid ${preference === opt.value ? 'var(--primary)' : 'var(--border-light)'}`,
                                 background: preference === opt.value ? 'var(--primary-bg, rgba(99,102,241,0.08))' : 'var(--bg-card)',
-                                cursor: prefSaving ? 'not-allowed' : 'pointer',
-                                transition: 'all 0.15s ease', textAlign: 'left',
-                                opacity: prefSaving ? 0.7 : 1,
+                                cursor: prefSaving ? 'not-allowed' : 'pointer', transition: 'all 0.15s ease',
+                                textAlign: 'left', opacity: prefSaving ? 0.7 : 1,
                                 boxShadow: preference === opt.value ? '0 0 0 3px rgba(99,102,241,0.15)' : 'none',
-                            }}
-                        >
+                            }}>
                             <span style={{ fontSize: '1.375rem', lineHeight: 1 }}>{opt.emoji}</span>
                             <span style={{ fontWeight: 700, fontSize: '0.875rem', color: preference === opt.value ? 'var(--primary)' : 'var(--text-primary)' }}>{opt.label}</span>
                             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{opt.desc}</span>
@@ -293,35 +302,25 @@ const BackupAvailability: React.FC = () => {
             <section style={{ marginBottom: 'var(--space-xl)' }}>
                 <h2 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '4px' }}>Opt-in as Backup</h2>
                 <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: 'var(--space-md)', marginTop: 0 }}>
-                    Click any upcoming date to declare yourself available as a backup instructor for that day.
+                    Click one or more dates to select them, then choose your available time slot in the panel.
                 </p>
 
                 <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
 
-                    {/* ── Calendar card ── */}
+                    {/* ── Calendar ── */}
                     <div style={{
                         flex: '1 1 300px', minWidth: '290px',
-                        background: 'var(--bg-card)',
-                        border: '1px solid var(--border-light)',
-                        borderRadius: 'var(--radius-lg)',
-                        padding: 'var(--space-lg)',
+                        background: 'var(--bg-card)', border: '1px solid var(--border-light)',
+                        borderRadius: 'var(--radius-lg)', padding: 'var(--space-lg)',
                     }}>
                         {/* Month nav */}
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-                            <button
-                                onClick={prevMonth}
-                                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 10px', fontSize: '1.1rem', color: 'var(--text-secondary)', borderRadius: 'var(--radius-sm)', lineHeight: 1 }}
-                            >‹</button>
-                            <span style={{ fontWeight: 700, fontSize: '0.9375rem' }}>
-                                {MONTH_NAMES[viewMonth]} {viewYear}
-                            </span>
-                            <button
-                                onClick={nextMonth}
-                                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 10px', fontSize: '1.1rem', color: 'var(--text-secondary)', borderRadius: 'var(--radius-sm)', lineHeight: 1 }}
-                            >›</button>
+                            <button onClick={prevMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 10px', fontSize: '1.1rem', color: 'var(--text-secondary)', borderRadius: 'var(--radius-sm)', lineHeight: 1 }}>‹</button>
+                            <span style={{ fontWeight: 700, fontSize: '0.9375rem' }}>{MONTH_NAMES[viewMonth]} {viewYear}</span>
+                            <button onClick={nextMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 10px', fontSize: '1.1rem', color: 'var(--text-secondary)', borderRadius: 'var(--radius-sm)', lineHeight: 1 }}>›</button>
                         </div>
 
-                        {/* Day-of-week headers */}
+                        {/* Day headers */}
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', marginBottom: '6px' }}>
                             {DAY_NAMES.map(d => (
                                 <div key={d} style={{ textAlign: 'center', fontSize: '0.6875rem', fontWeight: 600, color: 'var(--text-muted)', padding: '2px 0' }}>{d}</div>
@@ -335,51 +334,45 @@ const BackupAvailability: React.FC = () => {
                                 const iso        = toISO(viewYear, viewMonth, day);
                                 const isPast     = iso < todayISO;
                                 const isToday    = iso === todayISO;
-                                const isSelected = iso === popupDay;
+                                const isSelected = selectedDays.has(iso);
+                                const fullyBlk   = isFullyBlocked(iso);
                                 const dayStandby = getDayStandby(iso);
                                 const blocked    = classMap[iso] || [];
-                                const hasMorningClass  = blocked.includes('morning');
-                                const hasEveningClass  = blocked.includes('evening');
-                                const hasMorningStby   = dayStandby.some(s => s.slot === 'morning' || s.slot === 'both');
-                                const hasEveningStby   = dayStandby.some(s => s.slot === 'evening' || s.slot === 'both');
 
                                 return (
                                     <button
                                         key={iso}
-                                        onClick={() => !isPast && handleDayClick(iso)}
-                                        title={iso}
+                                        onClick={() => toggleDay(iso)}
+                                        title={fullyBlk ? 'Classes at all times — unavailable' : isPast ? 'Past date' : iso}
                                         style={{
                                             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
-                                            padding: '5px 2px',
-                                            borderRadius: 'var(--radius-sm)',
+                                            padding: '5px 2px', borderRadius: 'var(--radius-sm)',
                                             border: isSelected
                                                 ? '2px solid var(--primary)'
                                                 : isToday
                                                     ? '1.5px solid var(--primary)'
                                                     : '1.5px solid transparent',
                                             background: isSelected
-                                                ? 'rgba(99,102,241,0.13)'
+                                                ? 'rgba(99,102,241,0.18)'
                                                 : isToday
                                                     ? 'rgba(99,102,241,0.06)'
                                                     : 'transparent',
-                                            cursor: isPast ? 'default' : 'pointer',
-                                            opacity: isPast ? 0.32 : 1,
+                                            cursor: isPast || fullyBlk ? 'not-allowed' : 'pointer',
+                                            opacity: isPast ? 0.3 : fullyBlk ? 0.45 : 1,
                                             transition: 'all 0.1s ease',
                                         }}
                                     >
                                         <span style={{
-                                            fontSize: '0.8rem',
+                                            fontSize: '0.8rem', lineHeight: 1,
                                             fontWeight: isToday || isSelected ? 700 : 400,
-                                            color: isSelected || isToday ? 'var(--primary)' : 'var(--text-primary)',
-                                            lineHeight: 1,
+                                            color: isSelected ? 'var(--primary)' : isToday ? 'var(--primary)' : 'var(--text-primary)',
                                         }}>{day}</span>
 
-                                        {/* Dot row */}
-                                        <div style={{ display: 'flex', gap: '2px', height: '5px', alignItems: 'center', flexWrap: 'nowrap' }}>
-                                            {hasMorningClass  && <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#ef4444', flexShrink: 0 }} />}
-                                            {hasEveningClass  && <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#f97316', flexShrink: 0 }} />}
-                                            {hasMorningStby   && <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#3b82f6', flexShrink: 0 }} />}
-                                            {hasEveningStby   && <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#8b5cf6', flexShrink: 0 }} />}
+                                        <div style={{ display: 'flex', gap: '2px', height: '5px', alignItems: 'center' }}>
+                                            {blocked.includes('morning')  && <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#ef4444', flexShrink: 0 }} />}
+                                            {blocked.includes('evening')  && <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#f97316', flexShrink: 0 }} />}
+                                            {dayStandby.some(s => s.slot === 'morning' || s.slot === 'both') && <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#3b82f6', flexShrink: 0 }} />}
+                                            {dayStandby.some(s => s.slot === 'evening' || s.slot === 'both') && <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#8b5cf6', flexShrink: 0 }} />}
                                         </div>
                                     </button>
                                 );
@@ -387,11 +380,7 @@ const BackupAvailability: React.FC = () => {
                         </div>
 
                         {/* Legend */}
-                        <div style={{
-                            display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '12px',
-                            paddingTop: '10px', borderTop: '1px solid var(--border-subtle)',
-                            fontSize: '0.6875rem', color: 'var(--text-muted)',
-                        }}>
+                        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid var(--border-subtle)', fontSize: '0.6875rem', color: 'var(--text-muted)' }}>
                             {[
                                 { color: '#ef4444', label: 'AM class' },
                                 { color: '#f97316', label: 'PM class' },
@@ -408,97 +397,120 @@ const BackupAvailability: React.FC = () => {
 
                     {/* ── Side panel ── */}
                     <div style={{
-                        flex: '0 0 248px', minWidth: '230px',
+                        flex: '0 0 255px', minWidth: '230px',
                         background: 'var(--bg-card)',
-                        border: `1.5px solid ${popupDay ? 'var(--primary)' : 'var(--border-light)'}`,
-                        borderRadius: 'var(--radius-lg)',
-                        padding: 'var(--space-lg)',
+                        border: `1.5px solid ${selectedDays.size > 0 ? 'var(--primary)' : 'var(--border-light)'}`,
+                        borderRadius: 'var(--radius-lg)', padding: 'var(--space-lg)',
                         transition: 'border-color 0.2s ease',
                     }}>
-                        {!popupDay ? (
+                        {selectedDays.size === 0 ? (
+                            /* Empty state */
                             <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
                                 <div style={{ fontSize: '2rem', marginBottom: '10px' }}>📅</div>
                                 <p style={{ fontSize: '0.8125rem', margin: 0, lineHeight: 1.5 }}>
-                                    Click a date on the calendar to opt-in as backup.
+                                    Click one or more dates on the calendar to get started.
                                 </p>
                             </div>
                         ) : (
                             <>
                                 {/* Panel header */}
-                                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px' }}>
+                                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '12px' }}>
                                     <div>
-                                        <div style={{ fontSize: '0.6875rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '3px' }}>
+                                        <div style={{ fontSize: '0.6875rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                                             Offer Backup Standby
                                         </div>
-                                        <div style={{ fontWeight: 700, fontSize: '0.9375rem' }}>{fmtHeader(popupDay)}</div>
+                                        <div style={{ fontWeight: 700, fontSize: '0.9375rem', marginTop: '2px' }}>
+                                            {selectedDays.size} {selectedDays.size === 1 ? 'date' : 'dates'} selected
+                                        </div>
                                     </div>
-                                    <button
-                                        onClick={() => setPopupDay(null)}
-                                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', color: 'var(--text-muted)', lineHeight: 1, padding: '0 0 0 6px', marginTop: '-2px' }}
-                                    >×</button>
+                                    <button onClick={clearSelection} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', color: 'var(--text-muted)', padding: 0, lineHeight: 1 }}>×</button>
+                                </div>
+
+                                {/* Selected dates list */}
+                                <div style={{
+                                    maxHeight: '120px', overflowY: 'auto', marginBottom: '14px',
+                                    padding: '8px 10px', background: 'var(--surface-elevated, var(--bg-page))',
+                                    borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)',
+                                }}>
+                                    {[...selectedDays].sort().map(iso => {
+                                        const b = classMap[iso] || [];
+                                        const willSkip = blockedForSlot(iso, panelSlot);
+                                        return (
+                                            <div key={iso} style={{
+                                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                                fontSize: '0.8rem', padding: '2px 0',
+                                                color: willSkip ? 'var(--text-muted)' : 'var(--text-primary)',
+                                                textDecoration: willSkip ? 'line-through' : 'none',
+                                            }}>
+                                                <span>{fmtShort(iso)}</span>
+                                                <div style={{ display: 'flex', gap: '3px' }}>
+                                                    {b.includes('morning') && <span style={{ fontSize: '0.6rem', background: '#fef2f2', color: '#ef4444', padding: '1px 5px', borderRadius: '99px', fontWeight: 600 }}>AM</span>}
+                                                    {b.includes('evening') && <span style={{ fontSize: '0.6rem', background: '#fff7ed', color: '#f97316', padding: '1px 5px', borderRadius: '99px', fontWeight: 600 }}>PM</span>}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
 
                                 {/* Alerts */}
-                                {popupError && (
+                                {panelError && (
                                     <div style={{ marginBottom: '12px', padding: '8px 12px', background: 'var(--danger-bg)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 'var(--radius-sm)', color: 'var(--danger)', fontSize: '0.8rem' }}>
-                                        {popupError}
+                                        {panelError}
                                     </div>
                                 )}
-                                {popupSuccess && (
+                                {panelResult && (
                                     <div style={{ marginBottom: '12px', padding: '8px 12px', background: 'var(--success-bg)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 'var(--radius-sm)', color: 'var(--success)', fontSize: '0.8rem' }}>
-                                        {popupSuccess}
-                                    </div>
-                                )}
-
-                                {/* All-blocked warning */}
-                                {allBlocked && (
-                                    <div style={{ padding: '10px 12px', background: 'var(--danger-bg)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 'var(--radius-md)', color: 'var(--danger)', fontSize: '0.8rem', marginBottom: '14px' }}>
-                                        You already have classes scheduled at all times on this day.
+                                        ✅ Opted-in for {panelResult.created} date{panelResult.created !== 1 ? 's' : ''}
+                                        {panelResult.skipped > 0 && ` · ${panelResult.skipped} skipped`}
                                     </div>
                                 )}
 
                                 {/* Slot options */}
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px' }}>
-                                    {(['morning', 'evening', 'both'] as const).map(s => {
-                                        const isBlocked =
-                                            s === 'morning' ? popupBlocked.includes('morning') :
-                                            s === 'evening' ? popupBlocked.includes('evening') :
-                                            popupBlocked.length > 0; // 'both' blocked if any class on that day
-                                        const isActive = popupSlot === s && !isBlocked;
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', marginBottom: '14px' }}>
+                                    {(['morning','evening','both'] as const).map(s => {
+                                        const disabledForAll = slotBlockedOnAll(s);
+                                        const skippedForThis = [...selectedDays].filter(iso => blockedForSlot(iso, s)).length;
+                                        const isActive = panelSlot === s && !disabledForAll;
 
                                         return (
-                                            <label
-                                                key={s}
-                                                style={{
-                                                    display: 'flex', alignItems: 'center', gap: '10px',
-                                                    padding: '9px 12px',
-                                                    borderRadius: 'var(--radius-sm)',
-                                                    border: `1.5px solid ${isActive ? 'var(--primary)' : 'var(--border-subtle)'}`,
-                                                    background: isActive ? 'rgba(99,102,241,0.08)' : 'transparent',
-                                                    cursor: isBlocked ? 'not-allowed' : 'pointer',
-                                                    opacity: isBlocked ? 0.42 : 1,
-                                                    transition: 'all 0.1s',
-                                                }}
-                                            >
+                                            <label key={s} style={{
+                                                display: 'flex', alignItems: 'center', gap: '10px',
+                                                padding: '9px 12px', borderRadius: 'var(--radius-sm)',
+                                                border: `1.5px solid ${isActive ? 'var(--primary)' : 'var(--border-subtle)'}`,
+                                                background: isActive ? 'rgba(99,102,241,0.08)' : 'transparent',
+                                                cursor: disabledForAll ? 'not-allowed' : 'pointer',
+                                                opacity: disabledForAll ? 0.4 : 1,
+                                                transition: 'all 0.1s',
+                                            }}>
                                                 <input
-                                                    type="radio"
-                                                    name="popupSlot"
-                                                    value={s}
-                                                    checked={popupSlot === s}
-                                                    disabled={isBlocked}
-                                                    onChange={() => setPopupSlot(s)}
+                                                    type="radio" name="panelSlot" value={s}
+                                                    checked={panelSlot === s}
+                                                    disabled={disabledForAll}
+                                                    onChange={() => setPanelSlot(s)}
                                                     style={{ accentColor: 'var(--primary)', margin: 0, flexShrink: 0 }}
                                                 />
                                                 <span style={{ fontSize: '0.875rem', fontWeight: 500, flex: 1 }}>
                                                     {s === 'morning' ? '🌅 Morning' : s === 'evening' ? '🌇 Evening' : '🔄 Both'}
                                                 </span>
-                                                {isBlocked && (
-                                                    <span style={{ fontSize: '0.6875rem', color: 'var(--danger)', fontWeight: 600 }}>Class</span>
+                                                {skippedForThis > 0 && !disabledForAll && (
+                                                    <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                                                        skip {skippedForThis}
+                                                    </span>
+                                                )}
+                                                {disabledForAll && (
+                                                    <span style={{ fontSize: '0.6875rem', color: 'var(--danger)', fontWeight: 600 }}>N/A</span>
                                                 )}
                                             </label>
                                         );
                                     })}
                                 </div>
+
+                                {/* Skip notice */}
+                                {skippedCount > 0 && (
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '10px', padding: '6px 10px', background: 'var(--surface-elevated, var(--bg-page))', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
+                                        ⚠️ {skippedCount} date{skippedCount !== 1 ? 's' : ''} will be skipped (class already scheduled)
+                                    </div>
+                                )}
 
                                 {/* Notes */}
                                 <div style={{ marginBottom: '14px' }}>
@@ -506,10 +518,10 @@ const BackupAvailability: React.FC = () => {
                                         rows={2}
                                         className="form-input"
                                         placeholder="Notes (optional)"
-                                        value={popupNotes}
-                                        onChange={e => setPopupNotes(e.target.value)}
+                                        value={panelNotes}
+                                        onChange={e => setPanelNotes(e.target.value)}
                                         maxLength={200}
-                                        disabled={allBlocked}
+                                        disabled={availableCount === 0}
                                         style={{ resize: 'none', fontSize: '0.8125rem', width: '100%', boxSizing: 'border-box' }}
                                     />
                                 </div>
@@ -517,11 +529,15 @@ const BackupAvailability: React.FC = () => {
                                 {/* Submit */}
                                 <button
                                     className="btn btn-primary"
-                                    onClick={handlePopupSubmit}
-                                    disabled={popupSubmitting || allBlocked}
+                                    onClick={handleSubmit}
+                                    disabled={panelSubmitting || availableCount === 0}
                                     style={{ width: '100%', fontWeight: 700 }}
                                 >
-                                    {popupSubmitting ? 'Saving…' : '✅ Opt-in as Backup'}
+                                    {panelSubmitting
+                                        ? 'Saving…'
+                                        : availableCount === 0
+                                            ? 'All dates blocked'
+                                            : `✅ Opt-in for ${availableCount} date${availableCount !== 1 ? 's' : ''}`}
                                 </button>
                             </>
                         )}
@@ -548,25 +564,22 @@ const BackupAvailability: React.FC = () => {
                 {standbySlots.length === 0 ? (
                     <div className="empty-state" style={{ padding: 'var(--space-xl) 0' }}>
                         <div className="empty-state-icon" style={{ fontSize: '1.75rem', marginBottom: '8px' }}>📅</div>
-                        <p className="empty-state-text">No active standby slots. Click a date on the calendar above to opt-in.</p>
+                        <p className="empty-state-text">No active standby slots. Select dates on the calendar above to opt-in.</p>
                     </div>
                 ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         {standbySlots.map(slot => (
-                            <div
-                                key={slot.id}
-                                style={{
-                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px',
-                                    padding: '14px 18px', background: 'var(--bg-card)',
-                                    border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', flexWrap: 'wrap',
-                                }}
-                            >
+                            <div key={slot.id} style={{
+                                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px',
+                                padding: '14px 18px', background: 'var(--bg-card)',
+                                border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', flexWrap: 'wrap',
+                            }}>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: '200px' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                                         <span style={{ fontWeight: 600, fontSize: '0.9375rem' }}>
                                             {slot.start_date === slot.end_date
-                                                ? fmtHeader(slot.start_date)
-                                                : `${fmtHeader(slot.start_date)} → ${fmtHeader(slot.end_date)}`}
+                                                ? fmtShort(slot.start_date)
+                                                : `${fmtShort(slot.start_date)} → ${fmtShort(slot.end_date)}`}
                                         </span>
                                         <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '2px 10px', borderRadius: '99px', background: 'var(--surface-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}>
                                             {slotLabel(slot.slot)}
@@ -580,11 +593,8 @@ const BackupAvailability: React.FC = () => {
                                             {slot.status === 'assigned' ? '✓ Assigned' : 'Awaiting Class'}
                                         </span>
                                     </div>
-                                    {slot.notes && (
-                                        <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>{slot.notes}</span>
-                                    )}
+                                    {slot.notes && <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>{slot.notes}</span>}
                                 </div>
-
                                 {slot.status !== 'assigned' && (
                                     <button
                                         className="btn btn-ghost btn-sm"
