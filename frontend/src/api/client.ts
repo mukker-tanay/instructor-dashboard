@@ -7,7 +7,10 @@ import type {
     ClassAdditionPayload,
     RequestsResponse,
     StatusUpdate,
+    BackupAvailability,
+    SlotPreference,
 } from '../types';
+
 
 const api = axios.create({
     baseURL: import.meta.env.VITE_API_URL || '/api',
@@ -153,4 +156,26 @@ export interface SystemLog {
 export const getSystemLogs = (level?: string, search?: string, limit: number = 100) =>
     api.get<SystemLog[]>('/logs', { params: { level, search, limit } }).then(r => r.data);
 
+/* ── Availability & Backup Standby ── */
+export interface AvailabilityMeResponse {
+    preferences: SlotPreference;
+    standby_slots: BackupAvailability[];
+}
+
+export const getAvailabilityMe = () =>
+    api.get<AvailabilityMeResponse>('/availability/me').then(r => r.data);
+
+export const createStandbySlot = (data: { start_date: string; end_date: string; slot: 'morning' | 'evening' | 'both'; notes?: string }) =>
+    api.post<{ message: string; data: BackupAvailability }>('/availability/standby', data).then(r => r.data);
+
+export const deleteStandbySlot = (slotId: string) =>
+    api.delete<{ message: string }>(`/availability/standby/${slotId}`).then(r => r.data);
+
+export const updateSlotPreferences = (data: { general_preference: 'morning' | 'evening' | 'both' | 'none'; notes?: string }) =>
+    api.put<{ message: string; data: SlotPreference }>('/availability/preferences', data).then(r => r.data);
+
+export const getAdminAvailabilityAll = () =>
+    api.get<{ preferences: SlotPreference[]; standby_slots: BackupAvailability[] }>('/availability/admin/all').then(r => r.data);
+
 export default api;
+

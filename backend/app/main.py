@@ -18,6 +18,8 @@ from app.routers.admin import router as admin_router
 from app.routers.policies import router as policies_router
 from app.routers.metabase import router as metabase_router
 from app.routers.logs import router as logs_router
+from app.routers.availability import router as availability_router
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -72,6 +74,8 @@ app.include_router(admin_router)
 app.include_router(policies_router)
 app.include_router(metabase_router)
 app.include_router(logs_router)
+app.include_router(availability_router)
+
 
 @app.get("/api/health")
 async def health_check():

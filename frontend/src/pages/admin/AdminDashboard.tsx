@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getAdminRequests, updateRequestStatus, getInstructorOptions, deleteRequests, getAllowedInstructors, addAllowedInstructor, removeAllowedInstructor, updateAllowedInstructorAlias, updateAllowedInstructorModules, getLocoUsers, addLocoUser, removeLocoUser } from '../../api/client';
-import type { RequestItem, StatusUpdate } from '../../types';
+import { getAdminRequests, updateRequestStatus, getInstructorOptions, deleteRequests, getAllowedInstructors, addAllowedInstructor, removeAllowedInstructor, updateAllowedInstructorAlias, updateAllowedInstructorModules, getLocoUsers, addLocoUser, removeLocoUser, getAdminAvailabilityAll } from '../../api/client';
+import type { RequestItem, StatusUpdate, BackupAvailability, SlotPreference } from '../../types';
 import Modal from '../../components/Modal';
 import AdminManualUnavailability from './AdminManualUnavailability';
 
@@ -54,6 +54,7 @@ const AdminDashboard: React.FC = () => {
     const [redFlagProof, setRedFlagProof] = useState('');
     const [instructorOptions, setInstructorOptions] = useState<{ name: string, email: string }[]>([]);
     const [customInstructor, setCustomInstructor] = useState('');
+    const [availabilityData, setAvailabilityData] = useState<{ preferences: SlotPreference[]; standby_slots: BackupAvailability[] } | null>(null);
 
     // Class addition-specific fields
     const [paymentStatus, setPaymentStatus] = useState('Sanctioned');
@@ -349,6 +350,9 @@ const AdminDashboard: React.FC = () => {
 
         if (r.request_type === 'unavailability') {
             getInstructorOptions().then(d => setInstructorOptions(d.instructors)).catch(() => { });
+            getAdminAvailabilityAll().then(d => setAvailabilityData(d)).catch(() => { setAvailabilityData(null); });
+        } else {
+            setAvailabilityData(null);
         }
 
         setShowModal(true);
@@ -711,31 +715,75 @@ const AdminDashboard: React.FC = () => {
                                             </select>
                                         </div>
 
-                                        {finalStatus === 'Instructor change' && (
-                                            <div className="form-group">
-                                                <label className="form-label">Replacement Instructor</label>
-                                                <select className="form-select" value={replacementInstructor} onChange={e => {
-                                                    setReplacementInstructor(e.target.value);
-                                                    if (e.target.value !== '__others__') setCustomInstructor('');
-                                                }}>
-                                                    <option value="">Select instructor...</option>
-                                                    {instructorOptions.map(inst => (
-                                                        <option key={inst.email} value={inst.email}>{inst.name} ({inst.email})</option>
-                                                    ))}
-                                                    <option value="__others__">Others</option>
-                                                </select>
-                                                {replacementInstructor === '__others__' && (
-                                                    <input
-                                                        type="text"
-                                                        className="form-input"
-                                                        style={{ marginTop: '8px' }}
-                                                        placeholder="Enter instructor name or email..."
-                                                        value={customInstructor}
-                                                        onChange={e => setCustomInstructor(e.target.value)}
-                                                    />
-                                                )}
-                                            </div>
-                                        )}
+                                        {finalStatus === 'Instructor change' && (() => {
+                                            // --- Smart standby tagging ---
+                                            const rawDate = String(selectedRequest?.['Original Date of Class (MM/DD/YYYY)'] || '').trim();
+                                            let classDateISO = '';
+                                            const mDate = rawDate.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+                                            if (mDate) {
+                                                const yr = mDate[3].length === 2 ? `20${mDate[3]}` : mDate[3];
+                                                classDateISO = `${yr}-${mDate[1].padStart(2, '0')}-${mDate[2].padStart(2, '0')}`;
+                                            }
+                                            const timeStr = String(selectedRequest?.['Original Time of Class (HH:MM AM/PM) IST'] || '').toUpperCase();
+                                            const classSlot: 'morning' | 'evening' = timeStr.includes('AM') ? 'morning' : 'evening';
+
+                                            const tagged = instructorOptions.map(inst => {
+                                                let tag: 'standby' | 'preferred' | 'other' = 'other';
+                                                if (availabilityData && classDateISO) {
+                                                    const hasStandby = availabilityData.standby_slots.some(s =>
+                                                        s.instructor_email.toLowerCase() === inst.email.toLowerCase() &&
+                                                        classDateISO >= s.start_date && classDateISO <= s.end_date &&
+                                                        (s.slot === classSlot || s.slot === 'both')
+                                                    );
+                                                    if (hasStandby) {
+                                                        tag = 'standby';
+                                                    } else {
+                                                        const pref = availabilityData.preferences.find(p =>
+                                                            p.instructor_email.toLowerCase() === inst.email.toLowerCase()
+                                                        );
+                                                        if (pref && (pref.general_preference === classSlot || pref.general_preference === 'both')) {
+                                                            tag = 'preferred';
+                                                        }
+                                                    }
+                                                }
+                                                return { ...inst, tag };
+                                            }).sort((a, b) => ({ standby: 0, preferred: 1, other: 2 }[a.tag] - { standby: 0, preferred: 1, other: 2 }[b.tag]));
+
+                                            return (
+                                                <div className="form-group">
+                                                    <label className="form-label">Replacement Instructor</label>
+                                                    {availabilityData && classDateISO && (
+                                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                                                            ⭐ = On standby for this date &amp; slot &nbsp;·&nbsp; 👍 = Prefers {classSlot} classes
+                                                        </div>
+                                                    )}
+                                                    <select className="form-select" value={replacementInstructor} onChange={e => {
+                                                        setReplacementInstructor(e.target.value);
+                                                        if (e.target.value !== '__others__') setCustomInstructor('');
+                                                    }}>
+                                                        <option value="">Select instructor...</option>
+                                                        {tagged.map(inst => (
+                                                            <option key={inst.email} value={inst.email}>
+                                                                {inst.tag === 'standby' ? '⭐ ' : inst.tag === 'preferred' ? '👍 ' : ''}
+                                                                {inst.name} ({inst.email})
+                                                                {inst.tag === 'standby' ? ' — On Standby' : inst.tag === 'preferred' ? ' — Prefers This Slot' : ''}
+                                                            </option>
+                                                        ))}
+                                                        <option value="__others__">Others</option>
+                                                    </select>
+                                                    {replacementInstructor === '__others__' && (
+                                                        <input
+                                                            type="text"
+                                                            className="form-input"
+                                                            style={{ marginTop: '8px' }}
+                                                            placeholder="Enter instructor name or email..."
+                                                            value={customInstructor}
+                                                            onChange={e => setCustomInstructor(e.target.value)}
+                                                        />
+                                                    )}
+                                                </div>
+                                            );
+                                        })()}
 
                                         <div className="form-group">
                                             <label className="form-label">Red Flag Proof (admin bookkeeping)</label>

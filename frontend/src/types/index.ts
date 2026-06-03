@@ -118,3 +118,22 @@ export interface StatusUpdate {
     final_status?: string;
     rejection_reason?: string;
 }
+
+export interface BackupAvailability {
+    id: string;
+    instructor_email: string;
+    start_date: string;
+    end_date: string;
+    slot: 'morning' | 'evening' | 'both';
+    status: 'active' | 'assigned';
+    notes?: string;
+    created_at: string;
+}
+
+export interface SlotPreference {
+    instructor_email: string;
+    general_preference: 'morning' | 'evening' | 'both' | 'none';
+    notes?: string;
+    updated_at: string;
+}
+

@@ -13,6 +13,7 @@ import MyRequests from './pages/instructor/MyRequests';
 import MyBatches from './pages/instructor/MyBatches';
 import PoliciesPage from './pages/instructor/PoliciesPage';
 import FAQPage from './pages/instructor/FAQPage';
+import BackupAvailability from './pages/instructor/BackupAvailability';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import ImpersonateRoute from './pages/admin/ImpersonateRoute';
 import MetabaseQueries from './pages/admin/MetabaseQueries';
@@ -149,6 +150,9 @@ const AppContent: React.FC = () => {
             } />
             <Route path="/instructor/faq" element={
                 <ProtectedRoute blockLoco><AppLayout><FAQPage /></AppLayout></ProtectedRoute>
+            } />
+            <Route path="/instructor/availability" element={
+                <ProtectedRoute blockLoco><AppLayout><BackupAvailability /></AppLayout></ProtectedRoute>
             } />
 
             {/* Loco route */}
