@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
     getAvailabilityMe,
     getClasses,
@@ -57,6 +57,19 @@ const fmtShort = (iso: string): string => {
 const slotLabel = (slot: string) =>
     slot === 'morning' ? '🌅 Morning' : slot === 'evening' ? '🌇 Evening' : slot === 'both' ? '🔄 Both' : slot;
 
+/** One list row per calendar day for single-day standbys (hides legacy duplicates). */
+const dedupeStandbySlots = (slots: BackupAvailability[]): BackupAvailability[] => {
+    const byKey = new Map<string, BackupAvailability>();
+    for (const s of slots) {
+        const key = s.start_date === s.end_date ? `day:${s.start_date}` : `range:${s.id}`;
+        const prev = byKey.get(key);
+        if (!prev || String(s.created_at || '') > String(prev.created_at || '')) {
+            byKey.set(key, s);
+        }
+    }
+    return [...byKey.values()].sort((a, b) => a.start_date.localeCompare(b.start_date));
+};
+
 /* ─── Component ─── */
 const BackupAvailability: React.FC = () => {
     const todayISO  = new Date().toISOString().split('T')[0];
@@ -85,7 +98,7 @@ const BackupAvailability: React.FC = () => {
     const [panelSlot,       setPanelSlot]       = useState<'morning'|'evening'|'both'>('morning');
     const [panelNotes,      setPanelNotes]      = useState('');
     const [panelSubmitting, setPanelSubmitting] = useState(false);
-    const [panelResult,     setPanelResult]     = useState<{ created: number; skipped: number } | null>(null);
+    const [panelResult,     setPanelResult]     = useState<{ created: number; updated: number; skipped: number } | null>(null);
     const [panelError,      setPanelError]      = useState('');
 
     /* ─── Fetch ─── */
@@ -197,13 +210,15 @@ const BackupAvailability: React.FC = () => {
 
         const daysToCreate = [...selectedDays].filter(iso => !blockedForSlot(iso, panelSlot));
         let created = 0;
+        let updated = 0;
         const errors: string[] = [];
 
         await Promise.all(
             daysToCreate.map(async iso => {
                 try {
-                    await createStandbySlot({ start_date: iso, end_date: iso, slot: panelSlot, notes: panelNotes.trim() });
-                    created++;
+                    const res = await createStandbySlot({ start_date: iso, end_date: iso, slot: panelSlot, notes: panelNotes.trim() });
+                    if (res.updated) updated++;
+                    else created++;
                 } catch (err: any) {
                     errors.push(err.response?.data?.detail || iso);
                 }
@@ -211,7 +226,7 @@ const BackupAvailability: React.FC = () => {
         );
 
         if (errors.length) setPanelError(`Some slots failed: ${errors.join(', ')}`);
-        setPanelResult({ created, skipped: skippedCount + errors.length });
+        setPanelResult({ created, updated, skipped: skippedCount + errors.length });
         setPanelSubmitting(false);
         setPanelNotes('');
         fetchData();
@@ -224,16 +239,20 @@ const BackupAvailability: React.FC = () => {
     };
 
     /* ─── Delete slot ─── */
-    const handleDeleteSlot = async (slotId: string) => {
+    const handleDeleteSlot = async (slot: BackupAvailability) => {
         if (!window.confirm('Remove this standby declaration?')) return;
-        setDeletingId(slotId);
+        setDeletingId(slot.id);
         try {
-            await deleteStandbySlot(slotId);
-            setStandbySlots(prev => prev.filter(s => s.id !== slotId));
+            await deleteStandbySlot(slot.id);
+            setStandbySlots(prev => prev.filter(s =>
+                !(s.start_date === slot.start_date && s.end_date === slot.end_date && s.status === 'active')
+            ));
         } catch (err: any) {
             alert(err.response?.data?.detail || 'Failed to remove standby slot.');
         } finally { setDeletingId(null); }
     };
+
+    const displayStandbySlots = useMemo(() => dedupeStandbySlots(standbySlots), [standbySlots]);
 
     /* ─── Loading ─── */
     if (loading) {
@@ -460,7 +479,10 @@ const BackupAvailability: React.FC = () => {
                                 )}
                                 {panelResult && (
                                     <div style={{ marginBottom: '12px', padding: '8px 12px', background: 'var(--success-bg)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 'var(--radius-sm)', color: 'var(--success)', fontSize: '0.8rem' }}>
-                                        ✅ Opted-in for {panelResult.created} date{panelResult.created !== 1 ? 's' : ''}
+                                        ✅
+                                        {panelResult.created > 0 && ` ${panelResult.created} added`}
+                                        {panelResult.updated > 0 && ` ${panelResult.updated} updated`}
+                                        {(panelResult.created === 0 && panelResult.updated === 0) && ' Saved'}
                                         {panelResult.skipped > 0 && ` · ${panelResult.skipped} skipped`}
                                     </div>
                                 )}
@@ -551,24 +573,24 @@ const BackupAvailability: React.FC = () => {
             <section>
                 <h2 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '4px' }}>
                     My Standby Slots
-                    {standbySlots.length > 0 && (
+                    {displayStandbySlots.length > 0 && (
                         <span style={{ marginLeft: '8px', fontSize: '0.75rem', fontWeight: 600, padding: '2px 8px', borderRadius: '99px', background: 'var(--primary-bg, rgba(99,102,241,0.1))', color: 'var(--primary)' }}>
-                            {standbySlots.length}
+                            {displayStandbySlots.length}
                         </span>
                     )}
                 </h2>
                 <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: 'var(--space-md)', marginTop: 0 }}>
-                    Active and upcoming standby declarations. Past slots are automatically hidden.
+                    Active and upcoming standby declarations. Re-selecting a date updates your slot for that day.
                 </p>
 
-                {standbySlots.length === 0 ? (
+                {displayStandbySlots.length === 0 ? (
                     <div className="empty-state" style={{ padding: 'var(--space-xl) 0' }}>
                         <div className="empty-state-icon" style={{ fontSize: '1.75rem', marginBottom: '8px' }}>📅</div>
                         <p className="empty-state-text">No active standby slots. Select dates on the calendar above to opt-in.</p>
                     </div>
                 ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        {standbySlots.map(slot => (
+                        {displayStandbySlots.map(slot => (
                             <div key={slot.id} style={{
                                 display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px',
                                 padding: '14px 18px', background: 'var(--bg-card)',
@@ -598,7 +620,7 @@ const BackupAvailability: React.FC = () => {
                                 {slot.status !== 'assigned' && (
                                     <button
                                         className="btn btn-ghost btn-sm"
-                                        onClick={() => handleDeleteSlot(slot.id)}
+                                        onClick={() => handleDeleteSlot(slot)}
                                         disabled={deletingId === slot.id}
                                         style={{ color: 'var(--danger)', borderColor: 'var(--danger)', opacity: deletingId === slot.id ? 0.5 : 1, whiteSpace: 'nowrap' }}
                                     >

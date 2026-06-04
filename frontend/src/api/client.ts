@@ -166,7 +166,7 @@ export const getAvailabilityMe = () =>
     api.get<AvailabilityMeResponse>('/availability/me').then(r => r.data);
 
 export const createStandbySlot = (data: { start_date: string; end_date: string; slot: 'morning' | 'evening' | 'both'; notes?: string }) =>
-    api.post<{ message: string; data: BackupAvailability }>('/availability/standby', data).then(r => r.data);
+    api.post<{ message: string; data: BackupAvailability; updated?: boolean }>('/availability/standby', data).then(r => r.data);
 
 export const deleteStandbySlot = (slotId: string) =>
     api.delete<{ message: string }>(`/availability/standby/${slotId}`).then(r => r.data);
