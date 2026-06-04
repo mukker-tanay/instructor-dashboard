@@ -22,6 +22,17 @@ const PREF_OPTIONS: { value: SlotPreference['general_preference']; label: string
     { value: 'none',    label: 'None',    emoji: '🛑', desc: 'Not open to new classes' },
 ];
 
+type SlotType = 'morning' | 'evening' | 'both';
+
+export type StandbyGroup = {
+    start_date: string;
+    end_date: string;
+    slot: SlotType;
+    status: BackupAvailability['status'];
+    notes?: string;
+    ids: string[];
+};
+
 /* ─── Helpers ─── */
 const getDaysInMonth = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
 const getFirstDay    = (y: number, m: number) => new Date(y, m, 1).getDay();
@@ -51,17 +62,27 @@ const timeToSlot = (raw: string): 'morning' | 'evening' | null => {
 
 const fmtShort = (iso: string): string => {
     const [y, m, d] = iso.split('-').map(Number);
-    return `${MONTH_NAMES[m-1].slice(0,3)} ${d}, ${y}`;
+    return `${MONTH_NAMES[m - 1].slice(0, 3)} ${d}, ${y}`;
 };
 
 const slotLabel = (slot: string) =>
     slot === 'morning' ? '🌅 Morning' : slot === 'evening' ? '🌇 Evening' : slot === 'both' ? '🔄 Both' : slot;
 
-/** One list row per calendar day for single-day standbys (hides legacy duplicates). */
+const addOneDay = (iso: string): string => {
+    const [y, m, d] = iso.split('-').map(Number);
+    const dt = new Date(y, m - 1, d + 1);
+    return toISO(dt.getFullYear(), dt.getMonth(), dt.getDate());
+};
+
+/** One active row per calendar day (single-day rows). */
 const dedupeStandbySlots = (slots: BackupAvailability[]): BackupAvailability[] => {
     const byKey = new Map<string, BackupAvailability>();
     for (const s of slots) {
-        const key = s.start_date === s.end_date ? `day:${s.start_date}` : `range:${s.id}`;
+        if (s.start_date !== s.end_date) {
+            byKey.set(`range:${s.id}`, s);
+            continue;
+        }
+        const key = `day:${s.start_date}`;
         const prev = byKey.get(key);
         if (!prev || String(s.created_at || '') > String(prev.created_at || '')) {
             byKey.set(key, s);
@@ -70,38 +91,114 @@ const dedupeStandbySlots = (slots: BackupAvailability[]): BackupAvailability[] =
     return [...byKey.values()].sort((a, b) => a.start_date.localeCompare(b.start_date));
 };
 
+/** Group consecutive single-day standbys with same slot, status, and notes. */
+export const groupConsecutiveStandbys = (slots: BackupAvailability[]): StandbyGroup[] => {
+    const groups: StandbyGroup[] = [];
+    const rangeRows = slots.filter(s => s.start_date !== s.end_date);
+    for (const r of rangeRows) {
+        groups.push({
+            start_date: r.start_date,
+            end_date: r.end_date,
+            slot: r.slot as SlotType,
+            status: r.status,
+            notes: r.notes,
+            ids: [r.id],
+        });
+    }
+
+    const singles = slots
+        .filter(s => s.start_date === s.end_date)
+        .sort((a, b) => a.start_date.localeCompare(b.start_date));
+
+    let current: StandbyGroup | null = null;
+    for (const day of singles) {
+        const slot = day.slot as SlotType;
+        if (!current) {
+            current = {
+                start_date: day.start_date,
+                end_date: day.end_date,
+                slot,
+                status: day.status,
+                notes: day.notes,
+                ids: [day.id],
+            };
+            continue;
+        }
+        const consecutive = addOneDay(current.end_date) === day.start_date;
+        const sameMeta =
+            day.slot === current.slot &&
+            day.status === current.status &&
+            (day.notes || '') === (current.notes || '');
+
+        if (consecutive && sameMeta) {
+            current.end_date = day.end_date;
+            current.ids.push(day.id);
+        } else {
+            groups.push(current);
+            current = {
+                start_date: day.start_date,
+                end_date: day.end_date,
+                slot,
+                status: day.status,
+                notes: day.notes,
+                ids: [day.id],
+            };
+        }
+    }
+    if (current) groups.push(current);
+
+    return groups.sort((a, b) => a.start_date.localeCompare(b.start_date));
+};
+
+const formatGroupDates = (g: StandbyGroup) =>
+    g.start_date === g.end_date
+        ? fmtShort(g.start_date)
+        : `${fmtShort(g.start_date)} → ${fmtShort(g.end_date)}`;
+
 /* ─── Component ─── */
 const BackupAvailability: React.FC = () => {
     const todayISO  = new Date().toISOString().split('T')[0];
     const todayDate = new Date();
 
-    /* Preference */
     const [preference, setPreference] = useState<SlotPreference['general_preference']>('none');
     const [prefNotes,  setPrefNotes]  = useState('');
     const [prefSaving, setPrefSaving] = useState(false);
     const [prefSaved,  setPrefSaved]  = useState(false);
 
-    /* Standby list */
     const [standbySlots, setStandbySlots] = useState<BackupAvailability[]>([]);
     const [loading,      setLoading]      = useState(true);
-    const [deletingId,   setDeletingId]   = useState<string | null>(null);
 
-    /* classMap: dateISO → ('morning'|'evening')[] */
     const [classMap, setClassMap] = useState<Record<string, ('morning'|'evening')[]>>({});
 
-    /* Calendar nav */
     const [viewYear,  setViewYear]  = useState(todayDate.getFullYear());
     const [viewMonth, setViewMonth] = useState(todayDate.getMonth());
 
-    /* Multi-select */
     const [selectedDays,    setSelectedDays]    = useState<Set<string>>(new Set());
-    const [panelSlot,       setPanelSlot]       = useState<'morning'|'evening'|'both'>('morning');
+    const [panelSlot,       setPanelSlot]       = useState<SlotType>('morning');
     const [panelNotes,      setPanelNotes]      = useState('');
     const [panelSubmitting, setPanelSubmitting] = useState(false);
     const [panelResult,     setPanelResult]     = useState<{ created: number; updated: number; skipped: number } | null>(null);
     const [panelError,      setPanelError]      = useState('');
 
-    /* ─── Fetch ─── */
+    const dedupedSlots = useMemo(() => dedupeStandbySlots(standbySlots), [standbySlots]);
+    const standbyByDay = useMemo(() => {
+        const map: Record<string, BackupAvailability> = {};
+        for (const s of dedupedSlots) {
+            if (s.start_date !== s.end_date) {
+                let d = s.start_date;
+                while (d <= s.end_date) {
+                    map[d] = s;
+                    d = addOneDay(d);
+                }
+            } else {
+                map[s.start_date] = s;
+            }
+        }
+        return map;
+    }, [dedupedSlots]);
+
+    const standbyGroups = useMemo(() => groupConsecutiveStandbys(dedupedSlots), [dedupedSlots]);
+
     const fetchData = useCallback(async () => {
         setLoading(true);
         try {
@@ -134,7 +231,23 @@ const BackupAvailability: React.FC = () => {
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
-    /* ─── Preference save ─── */
+    /* Sync panel slot/notes when selection changes */
+    useEffect(() => {
+        if (selectedDays.size === 0) return;
+        const ordered = [...selectedDays].sort();
+        const withStandby = ordered.map(iso => standbyByDay[iso]).filter(Boolean) as BackupAvailability[];
+        if (withStandby.length === 0) return;
+
+        const slots = new Set(withStandby.map(s => s.slot));
+        if (slots.size === 1) {
+            setPanelSlot([...slots][0] as SlotType);
+        }
+        const notesSet = new Set(withStandby.map(s => s.notes || ''));
+        if (notesSet.size === 1) {
+            setPanelNotes([...notesSet][0]);
+        }
+    }, [selectedDays, standbyByDay]);
+
     const handleSavePref = async (newPref: SlotPreference['general_preference']) => {
         setPreference(newPref);
         setPrefSaving(true); setPrefSaved(false);
@@ -147,7 +260,6 @@ const BackupAvailability: React.FC = () => {
         } finally { setPrefSaving(false); }
     };
 
-    /* ─── Calendar nav ─── */
     const prevMonth = () => {
         if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11); }
         else setViewMonth(m => m - 1);
@@ -157,7 +269,6 @@ const BackupAvailability: React.FC = () => {
         else setViewMonth(m => m + 1);
     };
 
-    /* ─── Day toggle ─── */
     const isFullyBlocked = (iso: string) => {
         const b = classMap[iso] || [];
         return b.includes('morning') && b.includes('evening');
@@ -167,7 +278,8 @@ const BackupAvailability: React.FC = () => {
         if (iso < todayISO || isFullyBlocked(iso)) return;
         setSelectedDays(prev => {
             const next = new Set(prev);
-            if (next.has(iso)) next.delete(iso); else next.add(iso);
+            if (next.has(iso)) next.delete(iso);
+            else next.add(iso);
             return next;
         });
         setPanelResult(null);
@@ -176,85 +288,187 @@ const BackupAvailability: React.FC = () => {
 
     const clearSelection = () => {
         setSelectedDays(new Set());
+        setPanelNotes('');
         setPanelResult(null);
         setPanelError('');
     };
 
-    /* ─── Panel slot availability across selected days ─── */
-    const slotBlockedOnAll = (slot: 'morning'|'evening'|'both'): boolean => {
+    const slotBlockedOnAll = (slot: SlotType): boolean => {
         if (selectedDays.size === 0) return false;
         return [...selectedDays].every(iso => {
             const b = classMap[iso] || [];
             if (slot === 'morning') return b.includes('morning');
             if (slot === 'evening') return b.includes('evening');
-            return b.length > 0; // 'both' blocked if any class
+            return b.length > 0;
         });
     };
 
-    const blockedForSlot = (iso: string, slot: 'morning'|'evening'|'both'): boolean => {
+    const blockedForSlot = (iso: string, slot: SlotType): boolean => {
         const b = classMap[iso] || [];
         if (slot === 'morning') return b.includes('morning');
         if (slot === 'evening') return b.includes('evening');
         return b.length > 0;
     };
 
-    const skippedCount = [...selectedDays].filter(iso => blockedForSlot(iso, panelSlot)).length;
-    const availableCount = selectedDays.size - skippedCount;
+    const selectedSorted = useMemo(() => [...selectedDays].sort(), [selectedDays]);
 
-    /* ─── Submit ─── */
+    const actionableDays = useMemo(
+        () => selectedSorted.filter(iso => !blockedForSlot(iso, panelSlot)),
+        [selectedSorted, panelSlot, classMap]
+    );
+
+    const skippedCount = selectedSorted.length - actionableDays.length;
+
+    const selectionAnalysis = useMemo(() => {
+        let createCount = 0;
+        let updateCount = 0;
+        let unchangedCount = 0;
+        let assignedCount = 0;
+        let removableCount = 0;
+
+        for (const iso of selectedSorted) {
+            const standby = standbyByDay[iso];
+            if (standby?.status === 'assigned') {
+                assignedCount++;
+                continue;
+            }
+            if (standby?.status === 'active') {
+                removableCount++;
+                if (blockedForSlot(iso, panelSlot)) continue;
+                if (standby.slot === panelSlot && (standby.notes || '') === panelNotes.trim()) {
+                    unchangedCount++;
+                } else {
+                    updateCount++;
+                }
+                continue;
+            }
+            if (!blockedForSlot(iso, panelSlot)) createCount++;
+        }
+
+        return { createCount, updateCount, unchangedCount, assignedCount, removableCount };
+    }, [selectedSorted, standbyByDay, panelSlot, panelNotes, classMap]);
+
+    const submitLabel = useMemo(() => {
+        const { createCount, updateCount, unchangedCount } = selectionAnalysis;
+        const actionCount = createCount + updateCount;
+        if (actionCount === 0) {
+            if (unchangedCount > 0) return 'Already set for this slot';
+            return 'All dates blocked';
+        }
+        if (updateCount > 0 && createCount === 0) {
+            return `Change availability (${updateCount} date${updateCount !== 1 ? 's' : ''})`;
+        }
+        if (updateCount > 0 && createCount > 0) {
+            return `Save availability (${createCount} new, ${updateCount} update${updateCount !== 1 ? 's' : ''})`;
+        }
+        return `Opt-in for ${createCount} date${createCount !== 1 ? 's' : ''}`;
+    }, [selectionAnalysis]);
+
+    const canSubmit =
+        !panelSubmitting &&
+        selectionAnalysis.createCount + selectionAnalysis.updateCount > 0;
+
+    const canRemoveStandby =
+        selectionAnalysis.removableCount > 0 &&
+        selectionAnalysis.removableCount ===
+            selectedSorted.filter(iso => standbyByDay[iso]?.status === 'active').length;
+
     const handleSubmit = async () => {
-        if (availableCount === 0) return;
+        if (!canSubmit) return;
         setPanelSubmitting(true);
         setPanelError('');
         setPanelResult(null);
 
-        const daysToCreate = [...selectedDays].filter(iso => !blockedForSlot(iso, panelSlot));
         let created = 0;
         let updated = 0;
         const errors: string[] = [];
 
         await Promise.all(
-            daysToCreate.map(async iso => {
+            actionableDays.map(async iso => {
+                const existing = standbyByDay[iso];
+                if (existing?.status === 'active' && existing.slot === panelSlot && (existing.notes || '') === panelNotes.trim()) {
+                    return;
+                }
                 try {
-                    const res = await createStandbySlot({ start_date: iso, end_date: iso, slot: panelSlot, notes: panelNotes.trim() });
+                    const res = await createStandbySlot({
+                        start_date: iso,
+                        end_date: iso,
+                        slot: panelSlot,
+                        notes: panelNotes.trim(),
+                    });
                     if (res.updated) updated++;
                     else created++;
-                } catch (err: any) {
-                    errors.push(err.response?.data?.detail || iso);
+                } catch (err: unknown) {
+                    const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+                    errors.push(detail || iso);
                 }
             })
         );
 
         if (errors.length) setPanelError(`Some slots failed: ${errors.join(', ')}`);
-        setPanelResult({ created, updated, skipped: skippedCount + errors.length });
+        setPanelResult({
+            created,
+            updated,
+            skipped: skippedCount + errors.length,
+        });
         setPanelSubmitting(false);
-        setPanelNotes('');
         fetchData();
-
-        // Clear selection after short delay
         setTimeout(() => {
             setSelectedDays(new Set());
             setPanelResult(null);
         }, 2500);
     };
 
-    /* ─── Delete slot ─── */
-    const handleDeleteSlot = async (slot: BackupAvailability) => {
-        if (!window.confirm('Remove this standby declaration?')) return;
-        setDeletingId(slot.id);
+    const handleRemoveSelected = async () => {
+        const toRemove = selectedSorted
+            .map(iso => standbyByDay[iso])
+            .filter((s): s is BackupAvailability => !!s && s.status === 'active' && s.start_date === s.end_date);
+
+        if (toRemove.length === 0) return;
+        const label = toRemove.length === 1
+            ? fmtShort(toRemove[0].start_date)
+            : `${toRemove.length} dates`;
+        if (!window.confirm(`Remove backup standby for ${label}?`)) return;
+
+        setPanelSubmitting(true);
+        setPanelError('');
         try {
-            await deleteStandbySlot(slot.id);
-            setStandbySlots(prev => prev.filter(s =>
-                !(s.start_date === slot.start_date && s.end_date === slot.end_date && s.status === 'active')
-            ));
-        } catch (err: any) {
-            alert(err.response?.data?.detail || 'Failed to remove standby slot.');
-        } finally { setDeletingId(null); }
+            const seen = new Set<string>();
+            for (const slot of toRemove) {
+                if (seen.has(slot.start_date)) continue;
+                seen.add(slot.start_date);
+                await deleteStandbySlot(slot.id);
+            }
+            setStandbySlots(prev =>
+                prev.filter(s => !seen.has(s.start_date) || s.status !== 'active')
+            );
+            clearSelection();
+            fetchData();
+        } catch (err: unknown) {
+            const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+            setPanelError(detail || 'Failed to remove standby.');
+        } finally {
+            setPanelSubmitting(false);
+        }
     };
 
-    const displayStandbySlots = useMemo(() => dedupeStandbySlots(standbySlots), [standbySlots]);
+    const jumpToGroup = (g: StandbyGroup) => {
+        const [y, m] = g.start_date.split('-').map(Number);
+        setViewYear(y);
+        setViewMonth(m - 1);
+        setSelectedDays(new Set(g.ids.length === 1 && g.start_date === g.end_date
+            ? [g.start_date]
+            : (() => {
+                const days: string[] = [];
+                let d = g.start_date;
+                while (d <= g.end_date) {
+                    days.push(d);
+                    d = addOneDay(d);
+                }
+                return days;
+            })()));
+    };
 
-    /* ─── Loading ─── */
     if (loading) {
         return (
             <div className="page-container">
@@ -263,7 +477,6 @@ const BackupAvailability: React.FC = () => {
         );
     }
 
-    /* ─── Calendar grid data ─── */
     const daysInMonth = getDaysInMonth(viewYear, viewMonth);
     const firstDay    = getFirstDay(viewYear, viewMonth);
     const gridCells: (number | null)[] = [
@@ -272,10 +485,8 @@ const BackupAvailability: React.FC = () => {
     ];
     while (gridCells.length % 7 !== 0) gridCells.push(null);
 
-    const getDayStandby = (iso: string) =>
-        standbySlots.filter(s => iso >= s.start_date && iso <= s.end_date);
+    const panelHasStandby = selectionAnalysis.removableCount > 0 || selectionAnalysis.assignedCount > 0;
 
-    /* ─── Render ─── */
     return (
         <div className="page-container">
             <div className="page-header">
@@ -285,7 +496,6 @@ const BackupAvailability: React.FC = () => {
                 </p>
             </div>
 
-            {/* ── Section 1: General Preference ── */}
             <section style={{ marginBottom: 'var(--space-xl)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: 'var(--space-md)' }}>
                     <h2 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>General Teaching Preference</h2>
@@ -317,65 +527,70 @@ const BackupAvailability: React.FC = () => {
 
             <div style={{ height: '1px', background: 'var(--border-subtle)', marginBottom: 'var(--space-xl)' }} />
 
-            {/* ── Section 2: Calendar ── */}
             <section style={{ marginBottom: 'var(--space-xl)' }}>
-                <h2 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '4px' }}>Opt-in as Backup</h2>
+                <h2 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '4px' }}>Backup calendar</h2>
                 <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: 'var(--space-md)', marginTop: 0 }}>
-                    Click one or more dates to select them, then choose your available time slot in the panel.
+                    Select dates on the calendar to opt in, change your slot, or remove standby. Manage everything from the panel — no need to scroll.
                 </p>
 
                 <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
 
-                    {/* ── Calendar ── */}
                     <div style={{
                         flex: '1 1 300px', minWidth: '290px',
                         background: 'var(--bg-card)', border: '1px solid var(--border-light)',
                         borderRadius: 'var(--radius-lg)', padding: 'var(--space-lg)',
                     }}>
-                        {/* Month nav */}
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-                            <button onClick={prevMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 10px', fontSize: '1.1rem', color: 'var(--text-secondary)', borderRadius: 'var(--radius-sm)', lineHeight: 1 }}>‹</button>
+                            <button type="button" onClick={prevMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 10px', fontSize: '1.1rem', color: 'var(--text-secondary)', borderRadius: 'var(--radius-sm)', lineHeight: 1 }}>‹</button>
                             <span style={{ fontWeight: 700, fontSize: '0.9375rem' }}>{MONTH_NAMES[viewMonth]} {viewYear}</span>
-                            <button onClick={nextMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 10px', fontSize: '1.1rem', color: 'var(--text-secondary)', borderRadius: 'var(--radius-sm)', lineHeight: 1 }}>›</button>
+                            <button type="button" onClick={nextMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 10px', fontSize: '1.1rem', color: 'var(--text-secondary)', borderRadius: 'var(--radius-sm)', lineHeight: 1 }}>›</button>
                         </div>
 
-                        {/* Day headers */}
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', marginBottom: '6px' }}>
                             {DAY_NAMES.map(d => (
                                 <div key={d} style={{ textAlign: 'center', fontSize: '0.6875rem', fontWeight: 600, color: 'var(--text-muted)', padding: '2px 0' }}>{d}</div>
                             ))}
                         </div>
 
-                        {/* Day grid */}
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '3px' }}>
                             {gridCells.map((day, i) => {
                                 if (day === null) return <div key={`e${i}`} />;
-                                const iso        = toISO(viewYear, viewMonth, day);
-                                const isPast     = iso < todayISO;
-                                const isToday    = iso === todayISO;
+                                const iso = toISO(viewYear, viewMonth, day);
+                                const isPast = iso < todayISO;
+                                const isToday = iso === todayISO;
                                 const isSelected = selectedDays.has(iso);
-                                const fullyBlk   = isFullyBlocked(iso);
-                                const dayStandby = getDayStandby(iso);
-                                const blocked    = classMap[iso] || [];
+                                const fullyBlk = isFullyBlocked(iso);
+                                const standby = standbyByDay[iso];
+                                const hasStandby = !!standby && standby.status === 'active';
+                                const blocked = classMap[iso] || [];
 
                                 return (
                                     <button
+                                        type="button"
                                         key={iso}
                                         onClick={() => toggleDay(iso)}
-                                        title={fullyBlk ? 'Classes at all times — unavailable' : isPast ? 'Past date' : iso}
+                                        title={
+                                            fullyBlk ? 'Classes at all times — unavailable'
+                                                : hasStandby ? `${iso} — on standby (${standby!.slot})`
+                                                : isPast ? 'Past date' : iso
+                                        }
                                         style={{
                                             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
                                             padding: '5px 2px', borderRadius: 'var(--radius-sm)',
                                             border: isSelected
                                                 ? '2px solid var(--primary)'
-                                                : isToday
-                                                    ? '1.5px solid var(--primary)'
-                                                    : '1.5px solid transparent',
+                                                : hasStandby
+                                                    ? '1.5px solid rgba(139,92,246,0.55)'
+                                                    : isToday
+                                                        ? '1.5px solid var(--primary)'
+                                                        : '1.5px solid transparent',
                                             background: isSelected
                                                 ? 'rgba(99,102,241,0.18)'
-                                                : isToday
-                                                    ? 'rgba(99,102,241,0.06)'
-                                                    : 'transparent',
+                                                : hasStandby
+                                                    ? 'rgba(139,92,246,0.1)'
+                                                    : isToday
+                                                        ? 'rgba(99,102,241,0.06)'
+                                                        : 'transparent',
                                             cursor: isPast || fullyBlk ? 'not-allowed' : 'pointer',
                                             opacity: isPast ? 0.3 : fullyBlk ? 0.45 : 1,
                                             transition: 'all 0.1s ease',
@@ -383,22 +598,24 @@ const BackupAvailability: React.FC = () => {
                                     >
                                         <span style={{
                                             fontSize: '0.8rem', lineHeight: 1,
-                                            fontWeight: isToday || isSelected ? 700 : 400,
-                                            color: isSelected ? 'var(--primary)' : isToday ? 'var(--primary)' : 'var(--text-primary)',
+                                            fontWeight: isToday || isSelected || hasStandby ? 700 : 400,
+                                            color: isSelected ? 'var(--primary)' : hasStandby ? '#7c3aed' : isToday ? 'var(--primary)' : 'var(--text-primary)',
                                         }}>{day}</span>
-
                                         <div style={{ display: 'flex', gap: '2px', height: '5px', alignItems: 'center' }}>
-                                            {blocked.includes('morning')  && <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#ef4444', flexShrink: 0 }} />}
-                                            {blocked.includes('evening')  && <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#f97316', flexShrink: 0 }} />}
-                                            {dayStandby.some(s => s.slot === 'morning' || s.slot === 'both') && <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#3b82f6', flexShrink: 0 }} />}
-                                            {dayStandby.some(s => s.slot === 'evening' || s.slot === 'both') && <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#8b5cf6', flexShrink: 0 }} />}
+                                            {blocked.includes('morning') && <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#ef4444', flexShrink: 0 }} />}
+                                            {blocked.includes('evening') && <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#f97316', flexShrink: 0 }} />}
+                                            {standby && (standby.slot === 'morning' || standby.slot === 'both') && (
+                                                <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#3b82f6', flexShrink: 0 }} />
+                                            )}
+                                            {standby && (standby.slot === 'evening' || standby.slot === 'both') && (
+                                                <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#8b5cf6', flexShrink: 0 }} />
+                                            )}
                                         </div>
                                     </button>
                                 );
                             })}
                         </div>
 
-                        {/* Legend */}
                         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid var(--border-subtle)', fontSize: '0.6875rem', color: 'var(--text-muted)' }}>
                             {[
                                 { color: '#ef4444', label: 'AM class' },
@@ -414,64 +631,69 @@ const BackupAvailability: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* ── Side panel ── */}
                     <div style={{
-                        flex: '0 0 255px', minWidth: '230px',
+                        flex: '0 0 280px', minWidth: '240px',
                         background: 'var(--bg-card)',
                         border: `1.5px solid ${selectedDays.size > 0 ? 'var(--primary)' : 'var(--border-light)'}`,
                         borderRadius: 'var(--radius-lg)', padding: 'var(--space-lg)',
                         transition: 'border-color 0.2s ease',
                     }}>
                         {selectedDays.size === 0 ? (
-                            /* Empty state */
                             <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
                                 <div style={{ fontSize: '2rem', marginBottom: '10px' }}>📅</div>
                                 <p style={{ fontSize: '0.8125rem', margin: 0, lineHeight: 1.5 }}>
-                                    Click one or more dates on the calendar to get started.
+                                    Click dates on the calendar to add, change, or remove standby.
                                 </p>
                             </div>
                         ) : (
                             <>
-                                {/* Panel header */}
                                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '12px' }}>
                                     <div>
                                         <div style={{ fontSize: '0.6875rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                                            Offer Backup Standby
+                                            {panelHasStandby ? 'Manage standby' : 'Offer backup standby'}
                                         </div>
                                         <div style={{ fontWeight: 700, fontSize: '0.9375rem', marginTop: '2px' }}>
                                             {selectedDays.size} {selectedDays.size === 1 ? 'date' : 'dates'} selected
                                         </div>
                                     </div>
-                                    <button onClick={clearSelection} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', color: 'var(--text-muted)', padding: 0, lineHeight: 1 }}>×</button>
+                                    <button type="button" onClick={clearSelection} aria-label="Clear selection" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', color: 'var(--text-muted)', padding: 0, lineHeight: 1 }}>×</button>
                                 </div>
 
-                                {/* Selected dates list */}
                                 <div style={{
-                                    maxHeight: '120px', overflowY: 'auto', marginBottom: '14px',
+                                    maxHeight: '140px', overflowY: 'auto', marginBottom: '14px',
                                     padding: '8px 10px', background: 'var(--surface-elevated, var(--bg-page))',
                                     borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)',
                                 }}>
-                                    {[...selectedDays].sort().map(iso => {
+                                    {selectedSorted.map(iso => {
                                         const b = classMap[iso] || [];
+                                        const standby = standbyByDay[iso];
                                         const willSkip = blockedForSlot(iso, panelSlot);
+                                        const isAssigned = standby?.status === 'assigned';
                                         return (
                                             <div key={iso} style={{
                                                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                                fontSize: '0.8rem', padding: '2px 0',
-                                                color: willSkip ? 'var(--text-muted)' : 'var(--text-primary)',
+                                                fontSize: '0.8rem', padding: '3px 0', gap: '6px',
+                                                color: willSkip || isAssigned ? 'var(--text-muted)' : 'var(--text-primary)',
                                                 textDecoration: willSkip ? 'line-through' : 'none',
                                             }}>
                                                 <span>{fmtShort(iso)}</span>
-                                                <div style={{ display: 'flex', gap: '3px' }}>
-                                                    {b.includes('morning') && <span style={{ fontSize: '0.6rem', background: '#fef2f2', color: '#ef4444', padding: '1px 5px', borderRadius: '99px', fontWeight: 600 }}>AM</span>}
-                                                    {b.includes('evening') && <span style={{ fontSize: '0.6rem', background: '#fff7ed', color: '#f97316', padding: '1px 5px', borderRadius: '99px', fontWeight: 600 }}>PM</span>}
+                                                <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                                                    {standby?.status === 'active' && (
+                                                        <span style={{ fontSize: '0.6rem', background: 'rgba(139,92,246,0.12)', color: '#7c3aed', padding: '1px 5px', borderRadius: '99px', fontWeight: 600 }}>
+                                                            {slotLabel(standby.slot).replace(/^.\s/, '')}
+                                                        </span>
+                                                    )}
+                                                    {isAssigned && (
+                                                        <span style={{ fontSize: '0.6rem', background: 'rgba(16,185,129,0.12)', color: 'var(--success)', padding: '1px 5px', borderRadius: '99px', fontWeight: 600 }}>Assigned</span>
+                                                    )}
+                                                    {b.includes('morning') && <span style={{ fontSize: '0.6rem', background: '#fef2f2', color: '#ef4444', padding: '1px 5px', borderRadius: '99px', fontWeight: 600 }}>AM class</span>}
+                                                    {b.includes('evening') && <span style={{ fontSize: '0.6rem', background: '#fff7ed', color: '#f97316', padding: '1px 5px', borderRadius: '99px', fontWeight: 600 }}>PM class</span>}
                                                 </div>
                                             </div>
                                         );
                                     })}
                                 </div>
 
-                                {/* Alerts */}
                                 {panelError && (
                                     <div style={{ marginBottom: '12px', padding: '8px 12px', background: 'var(--danger-bg)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 'var(--radius-sm)', color: 'var(--danger)', fontSize: '0.8rem' }}>
                                         {panelError}
@@ -482,18 +704,21 @@ const BackupAvailability: React.FC = () => {
                                         ✅
                                         {panelResult.created > 0 && ` ${panelResult.created} added`}
                                         {panelResult.updated > 0 && ` ${panelResult.updated} updated`}
-                                        {(panelResult.created === 0 && panelResult.updated === 0) && ' Saved'}
                                         {panelResult.skipped > 0 && ` · ${panelResult.skipped} skipped`}
                                     </div>
                                 )}
 
-                                {/* Slot options */}
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', marginBottom: '14px' }}>
-                                    {(['morning','evening','both'] as const).map(s => {
-                                        const disabledForAll = slotBlockedOnAll(s);
-                                        const skippedForThis = [...selectedDays].filter(iso => blockedForSlot(iso, s)).length;
-                                        const isActive = panelSlot === s && !disabledForAll;
+                                {selectionAnalysis.assignedCount > 0 && (
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '10px', padding: '6px 10px', background: 'var(--surface-elevated, var(--bg-page))', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
+                                        {selectionAnalysis.assignedCount} date{selectionAnalysis.assignedCount !== 1 ? 's' : ''} already assigned to a class — cannot change or remove.
+                                    </div>
+                                )}
 
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', marginBottom: '14px' }}>
+                                    {(['morning', 'evening', 'both'] as const).map(s => {
+                                        const disabledForAll = slotBlockedOnAll(s);
+                                        const skippedForThis = selectedSorted.filter(iso => blockedForSlot(iso, s)).length;
+                                        const isActive = panelSlot === s && !disabledForAll;
                                         return (
                                             <label key={s} style={{
                                                 display: 'flex', alignItems: 'center', gap: '10px',
@@ -502,10 +727,11 @@ const BackupAvailability: React.FC = () => {
                                                 background: isActive ? 'rgba(99,102,241,0.08)' : 'transparent',
                                                 cursor: disabledForAll ? 'not-allowed' : 'pointer',
                                                 opacity: disabledForAll ? 0.4 : 1,
-                                                transition: 'all 0.1s',
                                             }}>
                                                 <input
-                                                    type="radio" name="panelSlot" value={s}
+                                                    type="radio"
+                                                    name="panelSlot"
+                                                    value={s}
                                                     checked={panelSlot === s}
                                                     disabled={disabledForAll}
                                                     onChange={() => setPanelSlot(s)}
@@ -515,27 +741,20 @@ const BackupAvailability: React.FC = () => {
                                                     {s === 'morning' ? '🌅 Morning' : s === 'evening' ? '🌇 Evening' : '🔄 Both'}
                                                 </span>
                                                 {skippedForThis > 0 && !disabledForAll && (
-                                                    <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-                                                        skip {skippedForThis}
-                                                    </span>
-                                                )}
-                                                {disabledForAll && (
-                                                    <span style={{ fontSize: '0.6875rem', color: 'var(--danger)', fontWeight: 600 }}>N/A</span>
+                                                    <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>skip {skippedForThis}</span>
                                                 )}
                                             </label>
                                         );
                                     })}
                                 </div>
 
-                                {/* Skip notice */}
                                 {skippedCount > 0 && (
                                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '10px', padding: '6px 10px', background: 'var(--surface-elevated, var(--bg-page))', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
-                                        ⚠️ {skippedCount} date{skippedCount !== 1 ? 's' : ''} will be skipped (class already scheduled)
+                                        ⚠️ {skippedCount} date{skippedCount !== 1 ? 's' : ''} skipped (class already scheduled for this slot)
                                     </div>
                                 )}
 
-                                {/* Notes */}
-                                <div style={{ marginBottom: '14px' }}>
+                                <div style={{ marginBottom: '12px' }}>
                                     <textarea
                                         rows={2}
                                         className="form-input"
@@ -543,95 +762,93 @@ const BackupAvailability: React.FC = () => {
                                         value={panelNotes}
                                         onChange={e => setPanelNotes(e.target.value)}
                                         maxLength={200}
-                                        disabled={availableCount === 0}
+                                        disabled={selectionAnalysis.createCount + selectionAnalysis.updateCount === 0 && selectionAnalysis.unchangedCount > 0}
                                         style={{ resize: 'none', fontSize: '0.8125rem', width: '100%', boxSizing: 'border-box' }}
                                     />
                                 </div>
 
-                                {/* Submit */}
                                 <button
+                                    type="button"
                                     className="btn btn-primary"
                                     onClick={handleSubmit}
-                                    disabled={panelSubmitting || availableCount === 0}
-                                    style={{ width: '100%', fontWeight: 700 }}
+                                    disabled={!canSubmit}
+                                    style={{ width: '100%', fontWeight: 700, marginBottom: '8px' }}
                                 >
-                                    {panelSubmitting
-                                        ? 'Saving…'
-                                        : availableCount === 0
-                                            ? 'All dates blocked'
-                                            : `✅ Opt-in for ${availableCount} date${availableCount !== 1 ? 's' : ''}`}
+                                    {panelSubmitting ? 'Saving…' : submitLabel}
                                 </button>
+
+                                {selectionAnalysis.removableCount > 0 && (
+                                    <button
+                                        type="button"
+                                        className="btn btn-ghost btn-sm"
+                                        onClick={handleRemoveSelected}
+                                        disabled={panelSubmitting}
+                                        style={{ width: '100%', color: 'var(--danger)', borderColor: 'var(--danger)', fontWeight: 600 }}
+                                    >
+                                        {panelSubmitting
+                                            ? 'Working…'
+                                            : canRemoveStandby && selectedSorted.length === selectionAnalysis.removableCount
+                                                ? `Remove standby (${selectionAnalysis.removableCount} date${selectionAnalysis.removableCount !== 1 ? 's' : ''})`
+                                                : `Remove standby from selected dates (${selectionAnalysis.removableCount})`}
+                                    </button>
+                                )}
                             </>
                         )}
                     </div>
                 </div>
             </section>
 
-            <div style={{ height: '1px', background: 'var(--border-subtle)', marginBottom: 'var(--space-xl)' }} />
-
-            {/* ── Section 3: Standby List ── */}
-            <section>
-                <h2 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '4px' }}>
-                    My Standby Slots
-                    {displayStandbySlots.length > 0 && (
-                        <span style={{ marginLeft: '8px', fontSize: '0.75rem', fontWeight: 600, padding: '2px 8px', borderRadius: '99px', background: 'var(--primary-bg, rgba(99,102,241,0.1))', color: 'var(--primary)' }}>
-                            {displayStandbySlots.length}
-                        </span>
-                    )}
-                </h2>
-                <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: 'var(--space-md)', marginTop: 0 }}>
-                    Active and upcoming standby declarations. Re-selecting a date updates your slot for that day.
-                </p>
-
-                {displayStandbySlots.length === 0 ? (
-                    <div className="empty-state" style={{ padding: 'var(--space-xl) 0' }}>
-                        <div className="empty-state-icon" style={{ fontSize: '1.75rem', marginBottom: '8px' }}>📅</div>
-                        <p className="empty-state-text">No active standby slots. Select dates on the calendar above to opt-in.</p>
-                    </div>
-                ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        {displayStandbySlots.map(slot => (
-                            <div key={slot.id} style={{
-                                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px',
-                                padding: '14px 18px', background: 'var(--bg-card)',
-                                border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', flexWrap: 'wrap',
-                            }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: '200px' }}>
+            {standbyGroups.length > 0 && (
+                <>
+                    <div style={{ height: '1px', background: 'var(--border-subtle)', marginBottom: 'var(--space-xl)' }} />
+                    <section>
+                        <h2 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '4px' }}>
+                            My standby overview
+                            <span style={{ marginLeft: '8px', fontSize: '0.75rem', fontWeight: 600, padding: '2px 8px', borderRadius: '99px', background: 'var(--primary-bg, rgba(99,102,241,0.1))', color: 'var(--primary)' }}>
+                                {standbyGroups.length} {standbyGroups.length === 1 ? 'block' : 'blocks'}
+                            </span>
+                        </h2>
+                        <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: 'var(--space-md)', marginTop: 0 }}>
+                            Consecutive dates with the same slot are grouped. Click a row to jump to those dates on the calendar and manage them there.
+                        </p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {standbyGroups.map(g => (
+                                <button
+                                    type="button"
+                                    key={`${g.start_date}-${g.end_date}-${g.slot}-${g.ids[0]}`}
+                                    onClick={() => jumpToGroup(g)}
+                                    style={{
+                                        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
+                                        padding: '12px 16px', background: 'var(--bg-card)',
+                                        border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)',
+                                        cursor: 'pointer', textAlign: 'left', width: '100%',
+                                        transition: 'border-color 0.15s, background 0.15s',
+                                    }}
+                                >
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                        <span style={{ fontWeight: 600, fontSize: '0.9375rem' }}>
-                                            {slot.start_date === slot.end_date
-                                                ? fmtShort(slot.start_date)
-                                                : `${fmtShort(slot.start_date)} → ${fmtShort(slot.end_date)}`}
-                                        </span>
+                                        <span style={{ fontWeight: 600, fontSize: '0.9375rem' }}>{formatGroupDates(g)}</span>
                                         <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '2px 10px', borderRadius: '99px', background: 'var(--surface-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}>
-                                            {slotLabel(slot.slot)}
+                                            {slotLabel(g.slot)}
                                         </span>
-                                        <span style={{
-                                            fontSize: '0.75rem', fontWeight: 700, padding: '2px 10px', borderRadius: '99px',
-                                            background: slot.status === 'assigned' ? 'rgba(16,185,129,0.1)' : 'rgba(99,102,241,0.1)',
-                                            color: slot.status === 'assigned' ? 'var(--success)' : 'var(--primary)',
-                                            border: `1px solid ${slot.status === 'assigned' ? 'rgba(16,185,129,0.25)' : 'rgba(99,102,241,0.25)'}`,
-                                        }}>
-                                            {slot.status === 'assigned' ? '✓ Assigned' : 'Awaiting Class'}
-                                        </span>
+                                        {g.start_date !== g.end_date && (
+                                            <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>
+                                                {g.ids.length} days
+                                            </span>
+                                        )}
                                     </div>
-                                    {slot.notes && <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>{slot.notes}</span>}
-                                </div>
-                                {slot.status !== 'assigned' && (
-                                    <button
-                                        className="btn btn-ghost btn-sm"
-                                        onClick={() => handleDeleteSlot(slot)}
-                                        disabled={deletingId === slot.id}
-                                        style={{ color: 'var(--danger)', borderColor: 'var(--danger)', opacity: deletingId === slot.id ? 0.5 : 1, whiteSpace: 'nowrap' }}
-                                    >
-                                        {deletingId === slot.id ? 'Removing…' : 'Cancel Standby'}
-                                    </button>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </section>
+                                    <span style={{
+                                        fontSize: '0.75rem', fontWeight: 700, padding: '2px 10px', borderRadius: '99px', flexShrink: 0,
+                                        background: g.status === 'assigned' ? 'rgba(16,185,129,0.1)' : 'rgba(99,102,241,0.1)',
+                                        color: g.status === 'assigned' ? 'var(--success)' : 'var(--primary)',
+                                    }}>
+                                        {g.status === 'assigned' ? '✓ Assigned' : 'Awaiting'}
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+                    </section>
+                </>
+            )}
         </div>
     );
 };
