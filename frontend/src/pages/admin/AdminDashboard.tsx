@@ -394,6 +394,10 @@ const AdminDashboard: React.FC = () => {
                 payload.rejection_reason = rejectionReason;
             }
 
+            // #region agent log
+            fetch('http://127.0.0.1:7593/ingest/05a83b28-cfe1-45b3-a169-e148143c93b8', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '163677' }, body: JSON.stringify({ sessionId: '163677', hypothesisId: 'A,B', location: 'AdminDashboard.tsx:handleSubmitStatus', message: 'payload before status update', data: { requestId: rid, requestType: selectedRequest.request_type, payload, redFlagProof }, timestamp: Date.now() }) }).catch(() => {});
+            // #endregion
+
             await updateRequestStatus(rid, payload);
             setShowModal(false);
             fetchRequests();
