@@ -164,10 +164,8 @@ async def update_request_status(
             updates["final_status"] = body.final_status
         if body.replacement_instructor:
             updates["replacement_instructor"] = body.replacement_instructor
-        if body.red_flag:
-            # For unavailability, we store the reason in 'red_flag_proof'
-            if body.red_flag.value in ("Yes", "Exempted") and body.red_flag_reason:
-                updates["red_flag_proof"] = body.red_flag_reason
+        if body.red_flag_reason:
+            updates["red_flag_proof"] = body.red_flag_reason
 
     if req_type == "class_addition":
         if body.payment_status:
