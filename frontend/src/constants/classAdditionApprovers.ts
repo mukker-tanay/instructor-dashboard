@@ -4,9 +4,9 @@ export interface ClassAdditionApprover {
 }
 
 export const CLASS_ADDITION_APPROVERS: ClassAdditionApprover[] = [
-    { name: 'Shivank Agrawal', track: 'AIML' },
-    { name: 'Viraj Shah', track: 'DSML' },
-    { name: 'Akhil', track: 'HLD' },
+    { name: 'Shivank Agrawal', track: 'If not sure, please select this' },
+    { name: 'Viraj Shah', track: 'AIML/DSML' },
+    { name: 'Akhil', track: 'Academy non-DSA Modules' },
     { name: 'Ayush Raj', track: 'Full Stack' },
     { name: 'Yogesh K', track: 'DSA' },
     { name: 'Vilas Varghese', track: 'DevOps' },
