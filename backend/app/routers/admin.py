@@ -1,14 +1,9 @@
 """Admin endpoints — view requests, approve/reject, delete."""
 
 import asyncio
-import json
 import logging
-import os
-import time
 from datetime import datetime
 from typing import List
-
-_DEBUG_LOG = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "debug-163677.log"))
 
 from pydantic import BaseModel
 
@@ -134,14 +129,6 @@ async def update_request_status(
     # Check if already finalized
     current_status = str(record.get("status", record.get("Status", ""))).strip()
 
-    # #region agent log
-    try:
-        with open(_DEBUG_LOG, "a", encoding="utf-8") as _f:
-            _f.write(json.dumps({"sessionId": "163677", "hypothesisId": "A,B,D", "location": "admin.py:update_request_status:entry", "message": "status update received", "data": {"request_id": request_id, "req_type": req_type, "current_status": current_status, "body_status": body.status.value, "red_flag": body.red_flag.value if body.red_flag else None, "red_flag_reason": body.red_flag_reason, "final_status": body.final_status, "replacement_instructor": body.replacement_instructor}, "timestamp": int(time.time() * 1000)}) + "\n")
-    except Exception:
-        pass
-    # #endregion
-    
     # Allow updating "Approved" requests for Class Addition (to update payment status)
     if current_status == "Rejected":
         raise HTTPException(status_code=400, detail="Request already rejected.")
@@ -180,25 +167,10 @@ async def update_request_status(
     if body.status.value == "Rejected" and body.rejection_reason:
         updates["rejection_reason"] = body.rejection_reason
 
-    # #region agent log
-    try:
-        with open(_DEBUG_LOG, "a", encoding="utf-8") as _f:
-            _f.write(json.dumps({"sessionId": "163677", "hypothesisId": "A,C", "location": "admin.py:update_request_status:pre_update", "message": "updates dict before supabase", "data": {"request_id": request_id, "req_type": req_type, "updates": updates, "red_flag_present": body.red_flag is not None}, "timestamp": int(time.time() * 1000)}) + "\n")
-    except Exception:
-        pass
-    # #endregion
-
     # Update in Supabase
     try:
         table_name = "unavailability_requests" if req_type == "unavailability" else "class_addition_requests"
-        result = supabase.table(table_name).update(updates).eq("id", request_id).execute()
-        # #region agent log
-        try:
-            with open(_DEBUG_LOG, "a", encoding="utf-8") as _f:
-                _f.write(json.dumps({"sessionId": "163677", "hypothesisId": "C,E", "location": "admin.py:update_request_status:post_update", "message": "supabase update result", "data": {"request_id": request_id, "table_name": table_name, "returned_red_flag_proof": (result.data[0].get("red_flag_proof") if result.data else None)}, "timestamp": int(time.time() * 1000)}) + "\n")
-        except Exception:
-            pass
-        # #endregion
+        supabase.table(table_name).update(updates).eq("id", request_id).execute()
     except Exception as e:
         print(f"[ERROR] Failed to update request in Supabase: {e}")
         raise HTTPException(status_code=500, detail="Database update failed.")

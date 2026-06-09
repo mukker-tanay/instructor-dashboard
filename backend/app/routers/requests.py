@@ -25,6 +25,43 @@ router = APIRouter(prefix="/api", tags=["requests"])
 
 IST = timezone(timedelta(hours=5, minutes=30))
 
+# Fallback Slack IDs for class-addition approvers (used when slack_members lookup misses)
+_KNOWN_APPROVER_SLACK_IDS = {
+    "Shivank Agrawal": "U035XV3G952",
+    "Viraj Shah": "U03ED6FU6M6",
+    "Akhil": "U096E277Z2M",
+    "Ayush Raj": "U066JHDP83W",
+    "Yogesh K": "U03HFGF2999",
+    "Yogesh Kumar": "U03HFGF2999",
+    "Vilas Varghese": "U0A9XSTAKU4",
+}
+
+
+def _resolve_approver_slack_id(approver: str) -> str:
+    """Resolve a Slack member ID from an approver label or legacy raw ID."""
+    if not approver:
+        return ""
+    if approver.startswith("U") and len(approver) <= 12:
+        return approver
+    lookup_name = approver.split("(")[0].strip()
+    fallback = _KNOWN_APPROVER_SLACK_IDS.get(lookup_name, "")
+    if fallback:
+        return fallback
+    try:
+        res = (
+            supabase.table("slack_members")
+            .select("id")
+            .ilike("name", f"%{lookup_name}%")
+            .limit(1)
+            .execute()
+        )
+        if res.data:
+            return str(res.data[0].get("id", "")).strip()
+    except Exception as e:
+        logger.error(f"Failed to lookup slack ID for approver '{approver}': {e}")
+    return ""
+
+
 _MONTHS = [
     'January','February','March','April','May','June',
     'July','August','September','October','November','December',
@@ -319,8 +356,7 @@ async def create_class_addition_request(
         raise HTTPException(status_code=500, detail="Database insertion failed")
 
     # --- Slack Workflow Notification ---
-    # The frontend now passes the raw Slack ID directly in body.approver
-    approver_id = body.approver if body.approver else ""
+    approver_id = _resolve_approver_slack_id(body.approver)
 
     workflow_data = {
         "instructor_email":       user.email,

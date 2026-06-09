@@ -4,6 +4,7 @@ import type { ClassItem } from '../../types';
 import Modal from '../../components/Modal';
 import type { BatchMeta } from '../../api/client';
 import { formatDate } from '../../utils/formatDate';
+import { CLASS_ADDITION_APPROVERS, formatApproverLabel } from '../../constants/classAdditionApprovers';
 
 /* ─── Unavailability Modal for a single class ─── */
 interface UnavailModalProps {
@@ -243,14 +244,6 @@ const generateTimeSlots = (): string[] => {
 };
 const TIME_SLOTS = generateTimeSlots();
 
-/* ─── Approver options (used in Class Addition) ─── */
-const APPROVER_OPTIONS = [
-    { name: "Shivank Agrawal", id: "U035XV3G952" },
-    { name: "Shubham Yadav", id: "U08TAQE0A8H" },
-    { name: "Vilas Varghese", id: "U0A9XSTAKU4" },
-    { name: "Ayush Raj", id: "U066JHDP83W" },
-    { name: "Yogesh Kumar", id: "U03HFGF2999" }
-];
 
 /* ─── Class Addition Modal ─── */
 interface ClassAddModalProps {
@@ -562,9 +555,12 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
                         <label className="form-label form-label-required">Select Approver</label>
                         <select className="form-select" style={{ appearance: 'none' }} value={approver} onChange={e => setApprover(e.target.value)}>
                             <option value="">Select approver...</option>
-                            {APPROVER_OPTIONS.map(approverObj => (
-                                <option key={approverObj.id} value={approverObj.id}>{approverObj.name}</option>
-                            ))}
+                            {CLASS_ADDITION_APPROVERS.map(approverObj => {
+                                const label = formatApproverLabel(approverObj);
+                                return (
+                                    <option key={label} value={label}>{label}</option>
+                                );
+                            })}
                         </select>
                     </div>
 
@@ -593,7 +589,7 @@ const ClassAdditionModal: React.FC<ClassAddModalProps> = ({ isOpen, onClose, onS
                             <div>
                                 <span style={{ color: 'var(--text-muted)' }}>Approver: </span>
                                 <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
-                                    {APPROVER_OPTIONS.find(op => op.id === approver)?.name}
+                                    {approver}
                                 </span>
                             </div>
                         )}
