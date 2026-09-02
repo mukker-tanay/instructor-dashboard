@@ -377,10 +377,22 @@ async def get_loco_searchable_instructors(admin: UserInfo = Depends(get_current_
             if row.get("alias_email"):
                 allowed_emails.add(str(row["alias_email"]).strip().lower())
 
-        res = supabase.table("classes").select("instructor_email,instructor_name,program").execute()
-        
+        # classes can have thousands of rows — PostgREST caps unbounded selects
+        # at its Max Rows setting, so we must paginate to see every row
+        # (same pattern as sync.py's pull_classes deletion check).
+        all_classes = []
+        page_size = 1000
+        offset = 0
+        while True:
+            page = supabase.table("classes").select("instructor_email,instructor_name,program").range(offset, offset + page_size - 1).execute()
+            data = page.data or []
+            all_classes.extend(data)
+            if len(data) < page_size:
+                break
+            offset += page_size
+
         instructors = {}
-        for row in (res.data or []):
+        for row in all_classes:
             email = str(row.get("instructor_email", "")).strip().lower()
             if email not in allowed_emails:
                 continue

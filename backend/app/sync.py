@@ -318,9 +318,25 @@ async def sync_deletions():
         ("class_addition_requests", CLASS_ADDITION_SHEET),
     ]:
         try:
-            # Get all IDs from Supabase
-            res = supabase.table(table).select("id").execute()
-            supabase_ids = {r["id"] for r in (res.data or [])}
+            # Get all IDs from Supabase. Paginate — an unbounded select() is
+            # silently capped at PostgREST's Max Rows setting once the table
+            # grows past it, which would make live rows look "orphaned" and
+            # get deleted from the sheet (same failure mode fixed in
+            # pull_classes's deletion check above).
+            supabase_ids = set()
+            page_size = 1000
+            offset = 0
+            while True:
+                page = supabase.table(table).select("id").range(offset, offset + page_size - 1).execute()
+                data = page.data or []
+                supabase_ids.update(r["id"] for r in data)
+                if len(data) < page_size:
+                    break
+                offset += page_size
+
+            if not supabase_ids:
+                logger.warning(f"No IDs found in '{table}' (table might be empty or fetch failed). Skipping deletion sync for '{sheet}' to prevent accidental mass deletion.")
+                continue
 
             # Get all Request IDs from the Sheet (column where ID is stored)
             # First, find the column index for Request ID / id
