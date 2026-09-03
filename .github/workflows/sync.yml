@@ -12,7 +12,7 @@ jobs:
     steps:
       - name: Call Sync API
         run: |
-          curl -X GET "https://instructor-dashboard-six.vercel.app/api/sync" \
+          curl -X GET "https://instructor-dashboard-739g.vercel.app/api/sync" \
           --max-time 600 \
           --fail \
           --silent \
