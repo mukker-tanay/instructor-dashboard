@@ -231,6 +231,25 @@ class SheetsService:
             logger.error(f"Error searching column {col_index} in '{sheet_name}': {e}")
             return None
 
+    def get_column_value_to_row_map(self, sheet_name: str, col_index: int) -> Dict[str, int]:
+        """Read column col_index once and return {value: row_number} (1-indexed).
+
+        For batch lookups (e.g. matching many request IDs against a sheet)
+        this replaces N separate find_row_by_value calls — each of which
+        re-reads the whole column — with a single API read.
+        """
+        try:
+            worksheet = self.spreadsheet.worksheet(sheet_name)
+            col_values = worksheet.col_values(col_index)
+            mapping: Dict[str, int] = {}
+            for i, v in enumerate(col_values, start=1):
+                if v:
+                    mapping[v] = i  # last occurrence wins, consistent with a plain scan-in-order
+            return mapping
+        except Exception as e:
+            logger.error(f"Error reading column {col_index} in '{sheet_name}': {e}")
+            return {}
+
     def update_cells(self, sheet_name: str, row: int, updates: Dict[int, Any]) -> None:
         """Update multiple cells in a row. updates = {col_index: value}."""
         try:

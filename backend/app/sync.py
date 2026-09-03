@@ -210,9 +210,15 @@ async def push_requests():
         unavail = supabase.table("unavailability_requests").select("*").eq("pushed_to_sheet", False).execute()
         records = unavail.data or []
         if records:
-            # Fetch header indices once for the whole batch (1 API call per sync)
+            # Fetch header indices + the full ID column once for the whole
+            # batch, instead of once per record — with 60+ pending records
+            # that used to mean 60+ Sheets API reads in a single request,
+            # risking rate limits / function timeout and, since a single
+            # failed record aborted the rest of the loop, leaving most of
+            # the batch stuck at pushed_to_sheet=False with no error shown.
             headers = await asyncio.to_thread(sheets_service.get_header_indices, UNAVAILABILITY_SHEET)
             id_col = headers.get("Request ID") or headers.get("request_id")
+            id_to_row = await asyncio.to_thread(sheets_service.get_column_value_to_row_map, UNAVAILABILITY_SHEET, id_col) if id_col else {}
 
             for rec in records:
                 row = [
@@ -243,16 +249,18 @@ async def push_requests():
                     rec.get("status", ""),
                 ]
                 request_id = rec.get("id", "")
-                existing_row = None
-                if id_col and request_id:
-                    existing_row = await asyncio.to_thread(
-                        sheets_service.find_row_by_value, UNAVAILABILITY_SHEET, id_col, request_id
-                    )
-                if existing_row:
-                    await asyncio.to_thread(sheets_service.update_row, UNAVAILABILITY_SHEET, existing_row, row)
-                else:
-                    await asyncio.to_thread(sheets_service.append_row, UNAVAILABILITY_SHEET, row)
-                supabase.table("unavailability_requests").update({"pushed_to_sheet": True}).eq("id", rec["id"]).execute()
+                existing_row = id_to_row.get(request_id) if id_col and request_id else None
+                try:
+                    if existing_row:
+                        await asyncio.to_thread(sheets_service.update_row, UNAVAILABILITY_SHEET, existing_row, row)
+                    else:
+                        await asyncio.to_thread(sheets_service.append_row, UNAVAILABILITY_SHEET, row)
+                    supabase.table("unavailability_requests").update({"pushed_to_sheet": True}).eq("id", rec["id"]).execute()
+                except Exception as e:
+                    # Isolate this record's failure so it doesn't block the
+                    # rest of the batch — pushed_to_sheet stays False and it
+                    # will simply retry on the next sync run.
+                    logger.error(f"Failed pushing unavailability request {request_id}: {e}")
 
     except Exception as e:
         logger.error(f"Failed pushing unavailability requests: {e}")
@@ -262,9 +270,12 @@ async def push_requests():
         class_add = supabase.table("class_addition_requests").select("*").eq("pushed_to_sheet", False).execute()
         records = class_add.data or []
         if records:
-            # Fetch header indices once for the whole batch (1 API call per sync)
+            # Fetch header indices + the full ID column once for the whole
+            # batch, instead of once per record (see the unavailability
+            # block above for why).
             headers = await asyncio.to_thread(sheets_service.get_header_indices, CLASS_ADDITION_SHEET)
             id_col = headers.get("Request ID") or headers.get("request_id")
+            id_to_row = await asyncio.to_thread(sheets_service.get_column_value_to_row_map, CLASS_ADDITION_SHEET, id_col) if id_col else {}
 
             for rec in records:
                 row = [
@@ -294,16 +305,15 @@ async def push_requests():
                     rec.get("status", ""),
                 ]
                 request_id = rec.get("id", "")
-                existing_row = None
-                if id_col and request_id:
-                    existing_row = await asyncio.to_thread(
-                        sheets_service.find_row_by_value, CLASS_ADDITION_SHEET, id_col, request_id
-                    )
-                if existing_row:
-                    await asyncio.to_thread(sheets_service.update_row, CLASS_ADDITION_SHEET, existing_row, row)
-                else:
-                    await asyncio.to_thread(sheets_service.append_row, CLASS_ADDITION_SHEET, row)
-                supabase.table("class_addition_requests").update({"pushed_to_sheet": True}).eq("id", rec["id"]).execute()
+                existing_row = id_to_row.get(request_id) if id_col and request_id else None
+                try:
+                    if existing_row:
+                        await asyncio.to_thread(sheets_service.update_row, CLASS_ADDITION_SHEET, existing_row, row)
+                    else:
+                        await asyncio.to_thread(sheets_service.append_row, CLASS_ADDITION_SHEET, row)
+                    supabase.table("class_addition_requests").update({"pushed_to_sheet": True}).eq("id", rec["id"]).execute()
+                except Exception as e:
+                    logger.error(f"Failed pushing class addition request {request_id}: {e}")
 
     except Exception as e:
         logger.error(f"Failed pushing class addition requests: {e}")
