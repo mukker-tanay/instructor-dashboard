@@ -10,7 +10,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from app.config import settings
 from app.sheets import sheets_service
 from app.cache import cache
-from app.sync import run_full_sync, get_sync_status
+from app.sync import run_full_sync, run_pull_sync, run_push_sync, get_sync_status
 from app.auth import router as auth_router
 from app.routers.classes import router as classes_router
 from app.routers.requests import router as requests_router
@@ -87,12 +87,34 @@ async def health_check():
 
 @app.get("/api/sync")
 async def trigger_sync():
-    """External Cron triggers this hourly to sync sheets & supabase."""
+    """Manual/full sync: runs both pull and push in one request. Kept for
+    workflow_dispatch and ad-hoc use; the hourly cron now calls the split
+    /api/sync/pull and /api/sync/push routes below instead."""
     try:
         await run_full_sync()
         return {"status": "ok", "message": "Synchronization completed successfully."}
     except Exception as e:
         logger.error(f"Manual Sync Failed: {e}")
+        return {"status": "error", "message": str(e)}
+
+@app.get("/api/sync/pull")
+async def trigger_pull_sync():
+    """Cron triggers this on the hour to pull classes/Slack config: Sheets -> Supabase."""
+    try:
+        await run_pull_sync()
+        return {"status": "ok", "message": "Pull sync completed successfully."}
+    except Exception as e:
+        logger.error(f"Pull Sync Failed: {e}")
+        return {"status": "error", "message": str(e)}
+
+@app.get("/api/sync/push")
+async def trigger_push_sync():
+    """Cron triggers this on the half-hour to push unavailability/class-addition requests: Supabase -> Sheets."""
+    try:
+        await run_push_sync()
+        return {"status": "ok", "message": "Push sync completed successfully."}
+    except Exception as e:
+        logger.error(f"Push Sync Failed: {e}")
         return {"status": "error", "message": str(e)}
 
 @app.get("/api/sync/status")

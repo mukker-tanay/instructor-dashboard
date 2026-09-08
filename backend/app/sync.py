@@ -508,3 +508,34 @@ async def run_full_sync():
     await sync_deletions()
     await sync_replacement_ratings()
     logger.info("--- SYNC ENGINE COMPLETED ---")
+
+
+async def run_pull_sync():
+    """Pulls classes + Slack config from Google Sheets into Supabase.
+
+    Split out from run_full_sync() so a pull-side failure/slowdown (e.g. the
+    transient Supabase connection drops in pull_classes()) can never delay or
+    starve the push side, which runs as a separate scheduled job/request via
+    run_push_sync().
+    """
+    logger.info("--- PULL SYNC STARTED ---")
+    await pull_classes()
+    await pull_slack_data()
+    logger.info("--- PULL SYNC COMPLETED ---")
+
+
+async def run_push_sync():
+    """Pushes unavailability + class-addition requests from Supabase to Google Sheets.
+
+    Split out from run_full_sync() (see run_pull_sync() docstring). Runs as
+    its own scheduled job so it always gets a turn regardless of pull-side
+    health. sync_replacement_ratings() runs first since its only effect is
+    flipping pushed_to_sheet=False for push_requests() to then pick up in the
+    same run — it never touched the classes/slack tables, so this reordering
+    changes nothing about its own behavior.
+    """
+    logger.info("--- PUSH SYNC STARTED ---")
+    await sync_replacement_ratings()
+    await push_requests()
+    await sync_deletions()
+    logger.info("--- PUSH SYNC COMPLETED ---")

@@ -2,17 +2,32 @@ name: Hourly Sync API Trigger
 
 on:
   schedule:
-    # Runs every 60 minutes
-    - cron: '*/60 * * * *'
+    # Pull (classes/Slack config): on the hour
+    - cron: '0 * * * *'
+    # Push (unavailability/class-addition requests): on the half-hour
+    - cron: '30 * * * *'
   workflow_dispatch: # Allows manual triggering from GitHub UI
 
 jobs:
-  trigger-sync:
+  trigger-pull-sync:
+    if: github.event.schedule == '0 * * * *' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
-      - name: Call Sync API
+      - name: Call Pull Sync API
         run: |
-          curl -X GET "https://instructor-dashboard-739g.vercel.app/api/sync" \
+          curl -X GET "https://instructor-dashboard-739g.vercel.app/api/sync/pull" \
+          --max-time 600 \
+          --fail \
+          --silent \
+          --show-error
+
+  trigger-push-sync:
+    if: github.event.schedule == '30 * * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call Push Sync API
+        run: |
+          curl -X GET "https://instructor-dashboard-739g.vercel.app/api/sync/push" \
           --max-time 600 \
           --fail \
           --silent \
