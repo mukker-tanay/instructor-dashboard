@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import time
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List
 
@@ -20,6 +21,36 @@ from app.supabase_client import supabase
 
 logger = logging.getLogger(__name__)
 IST = timezone(timedelta(hours=5, minutes=30))
+
+_TRANSIENT_MARKERS = ("server disconnected", "connectionterminated", "broken pipe", "connection reset", "remoteprotocolerror")
+
+
+def _call_with_retry(fn, *, context: str, max_retries: int = 3, base_delay: float = 0.5):
+    """Run a single Supabase call with retry on transient connection errors.
+
+    pull_classes() chunk upserts intermittently fail with "Server disconnected"
+    / "ConnectionTerminated" / "Broken pipe" — classic symptoms of this
+    serverless function reusing a stale keep-alive connection from a
+    frozen/thawed container against Supabase's pooler. These were previously
+    just logged and the whole chunk silently dropped (real data loss on
+    `classes`), and since it happens on almost every invocation, it was also
+    eating enough of the request's time/error budget that push_requests()
+    rarely got a turn (system_logs shows only 1 of ~26 runs over 2026-09-06
+    to 09-08 ever reached "Starting request push..."). A fresh connection
+    almost always succeeds on the very next attempt, mirroring the retry
+    already applied to the Sheets API calls in sheets.py.
+    """
+    for attempt in range(max_retries):
+        try:
+            return fn()
+        except Exception as e:
+            is_transient = any(m in str(e).lower() for m in _TRANSIENT_MARKERS)
+            if is_transient and attempt < max_retries - 1:
+                sleep_time = base_delay * (2 ** attempt)
+                logger.warning(f"Transient connection error for {context}: {e}. Retrying in {sleep_time}s (attempt {attempt + 1}/{max_retries})...")
+                time.sleep(sleep_time)
+                continue
+            raise
 
 
 def _to_ist_str(ts: str) -> str:
@@ -111,7 +142,10 @@ async def pull_classes():
         try:
             # Upsert requires a unique constraint on the column we are matching.
             # Assuming 'sheet_row_hash' is marked Unique in Supabase DB setting.
-            supabase.table("classes").upsert(chunk, on_conflict="sheet_row_hash").execute()
+            _call_with_retry(
+                lambda: supabase.table("classes").upsert(chunk, on_conflict="sheet_row_hash").execute(),
+                context=f"upsert classes chunk {i} to {i+len(chunk)}",
+            )
             logger.info(f"Upserted classes chunk {i} to {i+len(chunk)}")
         except Exception as e:
             logger.error(f"Failed to upsert classes chunk: {e}")
@@ -129,7 +163,10 @@ async def pull_classes():
             while True:
                 # We specifically fetch id and sheet_row_hash for classes.
                 # All classes in this table are synced from Google Sheets.
-                res = supabase.table("classes").select("id, sheet_row_hash").range(offset, offset + page_size - 1).execute()
+                res = _call_with_retry(
+                    lambda: supabase.table("classes").select("id, sheet_row_hash").range(offset, offset + page_size - 1).execute(),
+                    context=f"fetch classes for deletion check (offset {offset})",
+                )
                 data = res.data or []
                 all_supabase_classes.extend(data)
                 
@@ -148,7 +185,10 @@ async def pull_classes():
                 for i in range(0, len(ids_to_delete), chunk_size):
                     chunk_ids = ids_to_delete[i:i + chunk_size]
                     try:
-                        supabase.table("classes").delete().in_("id", chunk_ids).execute()
+                        _call_with_retry(
+                            lambda: supabase.table("classes").delete().in_("id", chunk_ids).execute(),
+                            context=f"delete orphaned classes chunk {i} to {i+len(chunk_ids)}",
+                        )
                         logger.info(f"Deleted orphaned classes chunk {i} to {i+len(chunk_ids)}")
                     except Exception as e:
                         logger.error(f"Failed to delete orphaned classes chunk: {e}")
