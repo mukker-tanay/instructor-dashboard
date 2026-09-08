@@ -259,6 +259,12 @@ async def push_requests():
             headers = await asyncio.to_thread(sheets_service.get_header_indices, UNAVAILABILITY_SHEET)
             id_col = headers.get("Request ID") or headers.get("request_id")
             id_to_row = await asyncio.to_thread(sheets_service.get_column_value_to_row_map, UNAVAILABILITY_SHEET, id_col) if id_col else {}
+            # Next row to write brand-new records to, computed from the ID
+            # column we just read (rather than trusting append_row's
+            # implicit "detect the table, append after it" behavior — see
+            # the class_addition block below for why that silently landed
+            # rows outside the visible table).
+            next_row = (max(id_to_row.values()) + 1) if id_to_row else None
 
             for rec in records:
                 row = [
@@ -293,7 +299,15 @@ async def push_requests():
                 try:
                     if existing_row:
                         await asyncio.to_thread(sheets_service.update_row, UNAVAILABILITY_SHEET, existing_row, row)
+                    elif next_row is not None:
+                        await asyncio.to_thread(sheets_service.update_row, UNAVAILABILITY_SHEET, next_row, row)
+                        if request_id:
+                            id_to_row[request_id] = next_row
+                        next_row += 1
                     else:
+                        # Couldn't find the ID column, so we have no reliable
+                        # "end of data" row — fall back to append_row's
+                        # auto-detection rather than guessing.
                         await asyncio.to_thread(sheets_service.append_row, UNAVAILABILITY_SHEET, row)
                     supabase.table("unavailability_requests").update({"pushed_to_sheet": True}).eq("id", rec["id"]).execute()
                 except Exception as e:
@@ -316,6 +330,17 @@ async def push_requests():
             headers = await asyncio.to_thread(sheets_service.get_header_indices, CLASS_ADDITION_SHEET)
             id_col = headers.get("Request ID") or headers.get("request_id")
             id_to_row = await asyncio.to_thread(sheets_service.get_column_value_to_row_map, CLASS_ADDITION_SHEET, id_col) if id_col else {}
+            # Next row for brand-new records — computed from the ID column
+            # we just read, not from append_row's implicit table-detection.
+            # append_row asks the Sheets API to auto-detect "the table" from
+            # a bare sheet-name range and write after it; if anything else
+            # in the sheet (a stray cell, a second block, a filter) throws
+            # that detection off, the row is written successfully (so the
+            # log says "Row appended" and Supabase gets pushed_to_sheet=True)
+            # but lands somewhere no one is looking — indistinguishable from
+            # silent data loss. Writing to a row number we derived ourselves
+            # from the real ID column removes that guesswork entirely.
+            next_row = (max(id_to_row.values()) + 1) if id_to_row else None
 
             for rec in records:
                 row = [
@@ -349,7 +374,15 @@ async def push_requests():
                 try:
                     if existing_row:
                         await asyncio.to_thread(sheets_service.update_row, CLASS_ADDITION_SHEET, existing_row, row)
+                    elif next_row is not None:
+                        await asyncio.to_thread(sheets_service.update_row, CLASS_ADDITION_SHEET, next_row, row)
+                        if request_id:
+                            id_to_row[request_id] = next_row
+                        next_row += 1
                     else:
+                        # Couldn't find the ID column, so we have no reliable
+                        # "end of data" row — fall back to append_row's
+                        # auto-detection rather than guessing.
                         await asyncio.to_thread(sheets_service.append_row, CLASS_ADDITION_SHEET, row)
                     supabase.table("class_addition_requests").update({"pushed_to_sheet": True}).eq("id", rec["id"]).execute()
                 except Exception as e:
