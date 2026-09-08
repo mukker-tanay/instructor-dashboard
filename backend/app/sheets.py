@@ -109,6 +109,26 @@ class SheetsService:
     # Tracking columns (request_id, status, locked_by, locked_at) are now
     # managed exclusively in Supabase — no Sheet-side enforcement needed.
 
+    def _call_with_retry(self, fn, *, context: str, max_retries: int = 3, base_delay: float = 1.0):
+        """Run a single gspread API call with exponential backoff on 429s.
+
+        get_all_records() below has always had this for reads; append_row,
+        update_row, and the header/column reads push_requests() and
+        sync_deletions() depend on never did, so a transient Sheets quota
+        error during a write raised immediately and was indistinguishable
+        from a real failure. Shared here so both paths back off the same way.
+        """
+        for attempt in range(max_retries):
+            try:
+                return fn()
+            except Exception as e:
+                if "429" in str(e) and attempt < max_retries - 1:
+                    sleep_time = base_delay * (2 ** attempt)
+                    logger.warning(f"Rate limit (429) hit for {context}. Retrying in {sleep_time}s (attempt {attempt + 1}/{max_retries})...")
+                    time.sleep(sleep_time)
+                    continue
+                raise
+
     @property
     def spreadsheet(self) -> gspread.Spreadsheet:
         if self._spreadsheet is None:
@@ -199,7 +219,10 @@ class SheetsService:
         """Append a single row to the specified sheet."""
         try:
             worksheet = self.spreadsheet.worksheet(sheet_name)
-            worksheet.append_row(row_data, value_input_option="USER_ENTERED")
+            self._call_with_retry(
+                lambda: worksheet.append_row(row_data, value_input_option="USER_ENTERED"),
+                context=f"append to '{sheet_name}'",
+            )
             logger.info(f"Row appended to '{sheet_name}'.")
         except Exception as e:
             logger.error(f"Error appending row to '{sheet_name}': {e}")
@@ -212,7 +235,10 @@ class SheetsService:
             # Build range e.g. "A5:Z5" — wide enough to cover all columns
             end_col = chr(ord('A') + len(row_data) - 1) if len(row_data) <= 26 else 'Z'
             cell_range = f"A{row_num}:{end_col}{row_num}"
-            worksheet.update(cell_range, [row_data], value_input_option="USER_ENTERED")
+            self._call_with_retry(
+                lambda: worksheet.update(cell_range, [row_data], value_input_option="USER_ENTERED"),
+                context=f"update row {row_num} in '{sheet_name}'",
+            )
             logger.info(f"Updated row {row_num} in '{sheet_name}'.")
         except Exception as e:
             logger.error(f"Error updating row {row_num} in '{sheet_name}': {e}")
@@ -231,6 +257,24 @@ class SheetsService:
             logger.error(f"Error searching column {col_index} in '{sheet_name}': {e}")
             return None
 
+    def get_column_values(self, sheet_name: str, col_index: int) -> List[str]:
+        """Read a single column's raw values (1-indexed), header included.
+
+        Used by sync_deletions() to compare the sheet's Request ID column
+        against Supabase — kept here (rather than reaching into
+        .spreadsheet.worksheet(...).col_values(...) directly) so the retry
+        behavior below is shared instead of duplicated at each call site.
+        """
+        try:
+            worksheet = self.spreadsheet.worksheet(sheet_name)
+            return self._call_with_retry(
+                lambda: worksheet.col_values(col_index),
+                context=f"read column {col_index} in '{sheet_name}'",
+            )
+        except Exception as e:
+            logger.error(f"Error reading column {col_index} in '{sheet_name}': {e}")
+            return []
+
     def get_column_value_to_row_map(self, sheet_name: str, col_index: int) -> Dict[str, int]:
         """Read column col_index once and return {value: row_number} (1-indexed).
 
@@ -238,17 +282,12 @@ class SheetsService:
         this replaces N separate find_row_by_value calls — each of which
         re-reads the whole column — with a single API read.
         """
-        try:
-            worksheet = self.spreadsheet.worksheet(sheet_name)
-            col_values = worksheet.col_values(col_index)
-            mapping: Dict[str, int] = {}
-            for i, v in enumerate(col_values, start=1):
-                if v:
-                    mapping[v] = i  # last occurrence wins, consistent with a plain scan-in-order
-            return mapping
-        except Exception as e:
-            logger.error(f"Error reading column {col_index} in '{sheet_name}': {e}")
-            return {}
+        col_values = self.get_column_values(sheet_name, col_index)
+        mapping: Dict[str, int] = {}
+        for i, v in enumerate(col_values, start=1):
+            if v:
+                mapping[v] = i  # last occurrence wins, consistent with a plain scan-in-order
+        return mapping
 
     def update_cells(self, sheet_name: str, row: int, updates: Dict[int, Any]) -> None:
         """Update multiple cells in a row. updates = {col_index: value}."""
@@ -265,7 +304,10 @@ class SheetsService:
         """Get a mapping of column header → 1-indexed column number."""
         try:
             worksheet = self.spreadsheet.worksheet(sheet_name)
-            headers = worksheet.row_values(1)
+            headers = self._call_with_retry(
+                lambda: worksheet.row_values(1),
+                context=f"read headers from '{sheet_name}'",
+            )
             return {h: i + 1 for i, h in enumerate(headers)}
         except Exception as e:
             logger.error(f"Error reading headers from '{sheet_name}': {e}")
@@ -275,7 +317,10 @@ class SheetsService:
         """Delete a specific row by 1-based row number (header = row 1)."""
         try:
             worksheet = self.spreadsheet.worksheet(sheet_name)
-            worksheet.delete_rows(row_number)
+            self._call_with_retry(
+                lambda: worksheet.delete_rows(row_number),
+                context=f"delete row {row_number} from '{sheet_name}'",
+            )
             logger.info(f"Deleted row {row_number} from '{sheet_name}'.")
         except Exception as e:
             logger.error(f"Error deleting row {row_number} from '{sheet_name}': {e}")

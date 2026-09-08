@@ -618,10 +618,10 @@ const BackupAvailability: React.FC = () => {
 
                         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid var(--border-subtle)', fontSize: '0.6875rem', color: 'var(--text-muted)' }}>
                             {[
-                                { color: '#ef4444', label: 'AM class' },
-                                { color: '#f97316', label: 'PM class' },
-                                { color: '#3b82f6', label: 'AM standby' },
-                                { color: '#8b5cf6', label: 'PM standby' },
+                                { color: '#ef4444', label: 'Morning class' },
+                                { color: '#f97316', label: 'Evening class' },
+                                { color: '#3b82f6', label: 'Morning standby' },
+                                { color: '#8b5cf6', label: 'Evening standby' },
                             ].map(({ color, label }) => (
                                 <span key={label} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                     <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: color, display: 'inline-block', flexShrink: 0 }} />
@@ -686,8 +686,8 @@ const BackupAvailability: React.FC = () => {
                                                     {isAssigned && (
                                                         <span style={{ fontSize: '0.6rem', background: 'rgba(16,185,129,0.12)', color: 'var(--success)', padding: '1px 5px', borderRadius: '99px', fontWeight: 600 }}>Assigned</span>
                                                     )}
-                                                    {b.includes('morning') && <span style={{ fontSize: '0.6rem', background: '#fef2f2', color: '#ef4444', padding: '1px 5px', borderRadius: '99px', fontWeight: 600 }}>AM class</span>}
-                                                    {b.includes('evening') && <span style={{ fontSize: '0.6rem', background: '#fff7ed', color: '#f97316', padding: '1px 5px', borderRadius: '99px', fontWeight: 600 }}>PM class</span>}
+                                                    {b.includes('morning') && <span style={{ fontSize: '0.6rem', background: '#fef2f2', color: '#ef4444', padding: '1px 5px', borderRadius: '99px', fontWeight: 600 }}>Morning class</span>}
+                                                    {b.includes('evening') && <span style={{ fontSize: '0.6rem', background: '#fff7ed', color: '#f97316', padding: '1px 5px', borderRadius: '99px', fontWeight: 600 }}>Evening class</span>}
                                                 </div>
                                             </div>
                                         );

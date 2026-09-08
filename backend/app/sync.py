@@ -357,25 +357,24 @@ async def sync_deletions():
                 logger.warning(f"Could not find Request ID column in '{sheet}', skipping deletion sync.")
                 continue
 
-            worksheet = await asyncio.to_thread(lambda: sheets_service.spreadsheet.worksheet(sheet))
-            col_values = await asyncio.to_thread(worksheet.col_values, id_col)
+            col_values = await asyncio.to_thread(sheets_service.get_column_values, sheet, id_col)
 
             # Find rows to delete (skip header row at index 0)
-            rows_to_delete = []
+            rows_to_delete = []  # list of (row_num, id_value) so deletions are traceable
             for i, val in enumerate(col_values):
                 if i == 0:  # skip header
                     continue
                 val = str(val).strip()
                 if val and val not in supabase_ids:
-                    rows_to_delete.append(i + 1)  # 1-indexed row number
+                    rows_to_delete.append((i + 1, val))  # 1-indexed row number
 
             # Delete in reverse order so row indices don't shift
-            for row_num in reversed(rows_to_delete):
+            for row_num, id_value in reversed(rows_to_delete):
                 try:
                     await asyncio.to_thread(sheets_service.delete_row, sheet, row_num)
-                    logger.info(f"Deleted orphaned row {row_num} from '{sheet}'")
+                    logger.info(f"Deleted orphaned row {row_num} (id={id_value}) from '{sheet}'")
                 except Exception as e:
-                    logger.warning(f"Failed to delete row {row_num} from '{sheet}': {e}")
+                    logger.warning(f"Failed to delete row {row_num} (id={id_value}) from '{sheet}': {e}")
 
             if rows_to_delete:
                 logger.info(f"Cleaned up {len(rows_to_delete)} orphaned row(s) from '{sheet}'")
