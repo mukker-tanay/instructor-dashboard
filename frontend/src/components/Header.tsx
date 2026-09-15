@@ -91,6 +91,23 @@ const Header: React.FC = () => {
                                 Backup &amp; Availability
                             </Link>
                             {user?.role === 'admin' && (
+                                <a
+                                    href="https://script.google.com/a/macros/scaler.com/s/AKfycbwOE_XnBoqQ90YSLFHxDAwi1a8v8ybOJo9vhYQ6LS5EhXoIV-AVReOzMggafZKEE-Qm/exec"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="nav-link"
+                                    // Google's Apps Script web apps send X-Frame-Options: DENY on
+                                    // every response (enforced by script.google.com itself, not
+                                    // overridable from the script side), so it can't be embedded
+                                    // as an iframe — a new-tab link is the only option.
+                                    // Admin-only for now — the production /exec deployment is
+                                    // still serving stale data (see: Deploy > Manage deployments
+                                    // needs a "New version"), so it isn't ready for instructors yet.
+                                >
+                                    OKR Ledger ↗
+                                </a>
+                            )}
+                            {user?.role === 'admin' && (
                                 <Link
                                     to="/instructor/admin"
                                     className={`nav-link ${isActive('/instructor/admin') ? 'active' : ''}`}
