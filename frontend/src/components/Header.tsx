@@ -90,18 +90,6 @@ const Header: React.FC = () => {
                             >
                                 Backup &amp; Availability
                             </Link>
-                            <a
-                                href="https://script.google.com/a/macros/scaler.com/s/AKfycbwOE_XnBoqQ90YSLFHxDAwi1a8v8ybOJo9vhYQ6LS5EhXoIV-AVReOzMggafZKEE-Qm/exec"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="nav-link"
-                                // Google's Apps Script web apps send X-Frame-Options: DENY on
-                                // every response (enforced by script.google.com itself, not
-                                // overridable from the script side), so it can't be embedded
-                                // as an iframe — a new-tab link is the only option.
-                            >
-                                OKR Dashboard ↗
-                            </a>
                             {user?.role === 'admin' && (
                                 <Link
                                     to="/instructor/admin"
