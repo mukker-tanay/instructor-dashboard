@@ -209,7 +209,7 @@ async def create_unavailability_request(
 
         # Send Slack Workflow notification (awaited to ensure it fires on Vercel serverless)
         program_lower = program.lower()
-        if "academy" in program_lower or "devops" in program_lower:
+        if "academy" in program_lower or "devops" in program_lower or "fde" in program_lower:
             webhook_url = settings.slack_unavailability_webhook_academy_devops
         else:
             webhook_url = settings.slack_unavailability_webhook_dsml_aiml
@@ -298,7 +298,7 @@ async def create_admin_unavailability_request(
     }
 
     program_lower = body.program.lower()
-    if "academy" in program_lower or "devops" in program_lower:
+    if "academy" in program_lower or "devops" in program_lower or "fde" in program_lower:
         webhook_url = settings.slack_unavailability_webhook_academy_devops
     else:
         webhook_url = settings.slack_unavailability_webhook_dsml_aiml
@@ -377,7 +377,7 @@ async def create_class_addition_request(
 
     # Send Slack Workflow notification (awaited to ensure it fires on Vercel serverless)
     program_lower = body.program.lower()
-    if "academy" in program_lower or "devops" in program_lower:
+    if "academy" in program_lower or "devops" in program_lower or "fde" in program_lower:
         webhook_url = settings.slack_class_addition_webhook_academy_devops
     else:
         webhook_url = settings.slack_class_addition_webhook_dsml_aiml
