@@ -8,6 +8,12 @@ class SupabaseLogHandler(logging.Handler):
     """Custom logging handler to send logs to Supabase asynchronously."""
     
     def emit(self, record):
+        # httpx logs the POST made by _insert_log() below at INFO level on
+        # the root logger, which this handler would otherwise re-capture and
+        # insert — whose own httpx POST gets logged again, forever. Exclude
+        # it (and the underlying httpcore transport logger) to break the loop.
+        if record.name in ("httpx", "httpcore"):
+            return
         try:
             # Format the exception traceback if present
             trace = self.formatException(record.exc_info) if record.exc_info else None
