@@ -238,18 +238,31 @@ class SheetsService:
         """
         try:
             worksheet = self.spreadsheet.worksheet(sheet_name)
-            if row_num > worksheet.row_count:
-                self._call_with_retry(
-                    lambda: worksheet.add_rows(row_num - worksheet.row_count),
-                    context=f"grow '{sheet_name}' to {row_num} rows",
-                )
             # Build range e.g. "A5:Z5" — wide enough to cover all columns
             end_col = chr(ord('A') + len(row_data) - 1) if len(row_data) <= 26 else 'Z'
             cell_range = f"A{row_num}:{end_col}{row_num}"
-            self._call_with_retry(
-                lambda: worksheet.update(cell_range, [row_data], value_input_option="USER_ENTERED"),
-                context=f"update row {row_num} in '{sheet_name}'",
-            )
+            try:
+                self._call_with_retry(
+                    lambda: worksheet.update(cell_range, [row_data], value_input_option="USER_ENTERED"),
+                    context=f"update row {row_num} in '{sheet_name}'",
+                )
+            except Exception as e:
+                # worksheet.row_count reflects whatever grid size gspread
+                # cached when this Worksheet object's metadata was last
+                # fetched — in a long-lived serverless container that can be
+                # stale for the lifetime of the container, so checking it
+                # before writing isn't reliable. Instead, grow on the actual
+                # "exceeds grid limits" error and retry once.
+                if "exceeds grid limits" not in str(e):
+                    raise
+                self._call_with_retry(
+                    lambda: worksheet.add_rows(max(row_num - worksheet.row_count, 1)),
+                    context=f"grow '{sheet_name}' to {row_num} rows",
+                )
+                self._call_with_retry(
+                    lambda: worksheet.update(cell_range, [row_data], value_input_option="USER_ENTERED"),
+                    context=f"update row {row_num} in '{sheet_name}' (after grow)",
+                )
             logger.info(f"Updated row {row_num} in '{sheet_name}'.")
         except Exception as e:
             logger.error(f"Error updating row {row_num} in '{sheet_name}': {e}")
