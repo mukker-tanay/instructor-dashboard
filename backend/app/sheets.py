@@ -229,9 +229,20 @@ class SheetsService:
             raise
 
     def update_row(self, sheet_name: str, row_num: int, row_data: List[Any]) -> None:
-        """Overwrite an existing row in place (1-indexed, header = row 1)."""
+        """Overwrite an existing row in place (1-indexed, header = row 1).
+
+        Unlike append_row, the Sheets API rejects a write past the sheet's
+        current grid size instead of growing it ("Range ... exceeds grid
+        limits") — so new-row writes here (next_row in sync.py) must grow
+        the grid first once row_num reaches the end of it.
+        """
         try:
             worksheet = self.spreadsheet.worksheet(sheet_name)
+            if row_num > worksheet.row_count:
+                self._call_with_retry(
+                    lambda: worksheet.add_rows(row_num - worksheet.row_count),
+                    context=f"grow '{sheet_name}' to {row_num} rows",
+                )
             # Build range e.g. "A5:Z5" — wide enough to cover all columns
             end_col = chr(ord('A') + len(row_data) - 1) if len(row_data) <= 26 else 'Z'
             cell_range = f"A{row_num}:{end_col}{row_num}"
