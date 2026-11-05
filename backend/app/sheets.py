@@ -113,6 +113,7 @@ class SheetsService:
             if nps_spreadsheet is None:
                 logger.warning("No nps_sheets row for the current month; NPS access list is empty.")
                 return set()
+            logger.info(f"NPS: resolved spreadsheet title={nps_spreadsheet.title!r} id={nps_spreadsheet.id!r}")
 
             access_worksheet = nps_spreadsheet.worksheet(NPS_ACCESS_SHEET)
             approved = {
@@ -133,7 +134,7 @@ class SheetsService:
 
             return approved - already_responded
         except Exception as e:
-            logger.error(f"Error fetching NPS access list: {e}")
+            logger.error(f"Error fetching NPS access list: {type(e).__name__}: {e!r}")
             return set()
 
     def append_nps_response(self, row: Dict[str, Any]) -> None:
