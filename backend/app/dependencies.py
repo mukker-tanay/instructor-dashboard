@@ -5,6 +5,7 @@ from fastapi import Request, HTTPException, Depends
 from app.auth import decode_jwt
 from app.models import UserInfo
 from app.config import settings
+from app.sheets import sheets_service
 
 async def get_current_user(request: Request) -> UserInfo:
     """Extract and validate the current user from the JWT session cookie.
@@ -23,6 +24,7 @@ async def get_current_user(request: Request) -> UserInfo:
         name=payload.get("name", ""),
         picture=payload.get("picture", ""),
         role=payload.get("role", "instructor"),
+        nps_eligible=payload.get("nps_eligible", False),
         raised_by_email=orig_email,
     )
 
@@ -42,6 +44,7 @@ async def get_current_user(request: Request) -> UserInfo:
             name=impersonate_email.split("@")[0],
             picture="",
             role=imp_role,
+            nps_eligible=impersonate_email.lower() in sheets_service.get_nps_access_emails(),
             raised_by_email=real_user.email,  # Track who actually submitted
         )
 
