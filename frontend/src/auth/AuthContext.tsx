@@ -36,6 +36,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
 
     const fetchUser = useCallback(async () => {
+        // DEMO ONLY: ?demoUser=1 fakes a logged-in instructor for local UI
+        // preview without a running backend. Remove before shipping.
+        if (new URLSearchParams(window.location.search).get('demoUser') === '1') {
+            setUser({ email: 'demo.instructor@scaler.com', name: 'Demo Instructor', picture: '', role: 'instructor', nps_eligible: true });
+            setLoading(false);
+            return;
+        }
         try {
             const u = await getMe();
             setUser(u);

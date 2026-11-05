@@ -12,6 +12,7 @@ from jose import jwt, JWTError
 from app.config import settings
 from app.models import UserInfo
 from app.supabase_client import supabase
+from app.sheets import sheets_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -27,6 +28,7 @@ def create_jwt(user: UserInfo) -> str:
         "name": user.name,
         "picture": user.picture,
         "role": user.role,
+        "nps_eligible": user.nps_eligible,
         "exp": datetime.now(timezone.utc) + timedelta(hours=settings.jwt_expiry_hours),
     }
     if getattr(user, "raised_by_email", ""):
@@ -132,11 +134,14 @@ async def auth_callback(request: Request, code: str):
         logger.error(f"Failed to verify instructor access for {email}: {e}")
         raise HTTPException(status_code=500, detail="Error verifying access permissions")
 
+    nps_eligible = email.lower() in sheets_service.get_nps_access_emails()
+
     user = UserInfo(
         email=email,
         name=userinfo.get("name", ""),
         picture=userinfo.get("picture", ""),
         role=role,
+        nps_eligible=nps_eligible,
     )
 
     token = create_jwt(user)
@@ -167,6 +172,7 @@ async def get_me(request: Request):
         name=payload.get("name", ""),
         picture=payload.get("picture", ""),
         role=payload.get("role", "instructor"),
+        nps_eligible=payload.get("nps_eligible", False),
     )
 
 
@@ -218,6 +224,7 @@ async def impersonate(request: Request):
         name=real_name,
         picture="",
         role=resolve_role(target_email),
+        nps_eligible=target_email.lower() in sheets_service.get_nps_access_emails(),
         raised_by_email=payload["sub"]
     )
     new_token = create_jwt(target_user)

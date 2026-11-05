@@ -25,6 +25,16 @@ BATCH_METRICS_SHEET = "batch_metrics"
 POLICIES_SHEET = "policies"
 SLACK_MEMBERS_SHEET = "Slack Member IDs"
 SLACK_GROUP_SHEET = "Slack Group IDs"
+NPS_SHEETS_SHEET = "nps_sheets"
+NPS_ACCESS_SHEET = "nps_access"
+NPS_RESPONSES_SHEET = "nps_responses"
+
+NPS_RESPONSE_HEADERS = [
+    "Timestamp", "Email", "Rating", "Segment",
+    "Challenges", "Challenges Other", "Follow Up", "Details",
+    "Improve", "Improve Other", "One Thing",
+    "Value Most", "Value Most Other", "Continue Doing", "Promoter Improve",
+]
 
 # ... (existing code) ...
 
@@ -54,6 +64,98 @@ class SheetsService:
         except Exception as e:
             logger.error(f"Error fetching ID mapping: {e}")
             return {}
+
+    def get_current_nps_sheet_row(self) -> Dict[str, Any]:
+        """
+        Read the "nps_sheets" tab in the main spreadsheet and return the
+        row for the current calendar month/year as a dict. One row per
+        month keeps a full history — add a new row each month instead of
+        overwriting the previous one.
+
+        Expected columns: Month, Year, Spreadsheet ID.
+        """
+        from datetime import datetime
+        now = datetime.now()
+        try:
+            records = self.get_all_records(NPS_SHEETS_SHEET)
+            for r in records:
+                month = str(r.get("Month", "")).strip()
+                year = str(r.get("Year", "")).strip()
+                if month.isdigit() and year.isdigit() and int(month) == now.month and int(year) == now.year:
+                    return r
+            return {}
+        except Exception as e:
+            logger.error(f"Error fetching nps_sheets row for {now.month}/{now.year}: {e}")
+            return {}
+
+    def get_current_nps_spreadsheet_id(self) -> str:
+        return str(self.get_current_nps_sheet_row().get("Spreadsheet ID", "")).strip()
+
+    def _open_current_nps_spreadsheet(self) -> Optional["gspread.Spreadsheet"]:
+        nps_spreadsheet_id = self.get_current_nps_spreadsheet_id()
+        if not nps_spreadsheet_id:
+            return None
+        # Ensure the shared gspread client is initialized.
+        _ = self.spreadsheet
+        return self._client.open_by_key(nps_spreadsheet_id)
+
+    def get_nps_access_emails(self) -> set:
+        """
+        Fetch the pre-approved Email list from the "nps_access" tab of this
+        month's NPS response spreadsheet (its ID comes from the
+        "nps_sheets" tab's row for the current month/year), minus whoever
+        has already submitted a response that month (Email column of our
+        own "nps_responses" tab) — once an instructor has filled the
+        survey, it should stop showing for them.
+        """
+        try:
+            nps_spreadsheet = self._open_current_nps_spreadsheet()
+            if nps_spreadsheet is None:
+                logger.warning("No nps_sheets row for the current month; NPS access list is empty.")
+                return set()
+
+            access_worksheet = nps_spreadsheet.worksheet(NPS_ACCESS_SHEET)
+            approved = {
+                str(r.get("Email", "")).strip().lower()
+                for r in access_worksheet.get_all_records()
+                if str(r.get("Email", "")).strip()
+            }
+
+            try:
+                responses_worksheet = nps_spreadsheet.worksheet(NPS_RESPONSES_SHEET)
+                already_responded = {
+                    str(r.get("Email", "")).strip().lower()
+                    for r in responses_worksheet.get_all_records()
+                    if str(r.get("Email", "")).strip()
+                }
+            except Exception:
+                already_responded = set()  # tab not created yet — nobody has responded
+
+            return approved - already_responded
+        except Exception as e:
+            logger.error(f"Error fetching NPS access list: {e}")
+            return set()
+
+    def append_nps_response(self, row: Dict[str, Any]) -> None:
+        """
+        Append one row to the "nps_responses" tab of this month's NPS
+        spreadsheet, creating the tab with headers if it doesn't exist yet.
+        `row` keys must match NPS_RESPONSE_HEADERS (missing keys -> "").
+        """
+        nps_spreadsheet = self._open_current_nps_spreadsheet()
+        if nps_spreadsheet is None:
+            raise ValueError("No nps_sheets row configured for the current month.")
+
+        try:
+            worksheet = nps_spreadsheet.worksheet(NPS_RESPONSES_SHEET)
+        except Exception:
+            worksheet = nps_spreadsheet.add_worksheet(title=NPS_RESPONSES_SHEET, rows=1000, cols=len(NPS_RESPONSE_HEADERS))
+            worksheet.append_row(NPS_RESPONSE_HEADERS, value_input_option="USER_ENTERED")
+
+        worksheet.append_row(
+            [str(row.get(h, "")) for h in NPS_RESPONSE_HEADERS],
+            value_input_option="USER_ENTERED",
+        )
 
     def initialize(self):
         """Initialize the gspread client using JSON string or service account file."""

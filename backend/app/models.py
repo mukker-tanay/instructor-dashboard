@@ -193,3 +193,4 @@ class UserInfo(BaseModel):
     picture: str = ""
     role: str = "instructor"  # "instructor", "admin", or "loco"
     raised_by_email: str = ""  # Admin/loco email if impersonating, else falls back to email
+    nps_eligible: bool = False  # True if email is in the nps_access sheet

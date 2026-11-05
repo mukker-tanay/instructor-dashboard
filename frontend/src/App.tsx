@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Analytics } from '@vercel/analytics/react';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import Header from './components/Header';
+import NpsFooter from './components/NpsFooter';
 import logoImg from './images/logo.png';
 import Modal from './components/Modal';
 
@@ -109,12 +110,16 @@ const ProtectedRoute: React.FC<{
 };
 
 /* ── App layout with header ── */
-const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-    <div className="app-layout">
-        <Header />
-        {children}
-    </div>
-);
+const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const { user } = useAuth();
+    return (
+        <div className="app-layout">
+            <Header />
+            {children}
+            {user?.nps_eligible && <NpsFooter />}
+        </div>
+    );
+};
 
 /* ── Root component ── */
 const AppContent: React.FC = () => {

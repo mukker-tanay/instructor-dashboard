@@ -5,6 +5,7 @@ export interface User {
     name: string;
     picture: string;
     role: 'instructor' | 'admin' | 'loco';
+    nps_eligible?: boolean;
 }
 
 export interface ClassItem {

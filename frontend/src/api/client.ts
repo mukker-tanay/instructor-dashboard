@@ -25,6 +25,24 @@ export const impersonateUser = (email: string) =>
 export const stopImpersonateUser = (adminToken: string) =>
     api.post('/auth/stop-impersonate', { admin_token: adminToken }).then(r => r.data);
 
+/* ── NPS ── */
+export type NpsSubmission = {
+    rating: number;
+    segment: 'detractor' | 'passive' | 'promoter';
+    challenges?: string[];
+    challenges_other?: string;
+    follow_up?: string;
+    details?: string;
+    improve?: string[];
+    improve_other?: string;
+    one_thing?: string;
+    value_most?: string[];
+    value_most_other?: string;
+    continue_doing?: string;
+    promoter_improve?: string;
+};
+export const submitNps = (body: NpsSubmission) => api.post('/nps/submit', body).then(r => r.data);
+
 /* ── Classes ── */
 export const getClasses = (type: 'upcoming' | 'past', limit = 5, offset = 0) =>
     api.get<ClassesResponse>('/classes', { params: { type, limit, offset } }).then(r => r.data);
