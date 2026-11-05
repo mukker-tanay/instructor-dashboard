@@ -133,7 +133,12 @@ class SheetsService:
                 already_responded = set()  # tab not created yet — nobody has responded
 
             eligible = approved - already_responded
-            logger.info(f"NPS: approved={sorted(approved)} already_responded={sorted(already_responded)} eligible={sorted(eligible)}")
+            shreesh_approved = [e for e in approved if "shreesh" in e]
+            shreesh_responded = [e for e in already_responded if "shreesh" in e]
+            logger.info(
+                f"NPS: counts approved={len(approved)} responded={len(already_responded)} eligible={len(eligible)} "
+                f"shreesh_in_approved={shreesh_approved} shreesh_in_responded={shreesh_responded}"
+            )
             return eligible
         except Exception as e:
             logger.error(f"Error fetching NPS access list: {type(e).__name__}: {e!r}")
