@@ -266,6 +266,8 @@ const AdminManualUnavailability: React.FC = () => {
                             <option value="Academy">Academy</option>
                             <option value="DSML">DSML</option>
                             <option value="DevOps">DevOps</option>
+                            <option value="AIML">AIML</option>
+                            <option value="FDE">FDE</option>
                         </select>
                     </div>
 
